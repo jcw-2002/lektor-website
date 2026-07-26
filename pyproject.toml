@@ -20,6 +20,9 @@ dependencies = [
     "lektor-webpack-support>=0.6.0",
 ]
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.uv.workspace]
 members = ["local-plugins/*"]
 
