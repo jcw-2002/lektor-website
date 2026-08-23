@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../static/styles.css?h=9b32885c">
+  <link rel="stylesheet" href="../../static/pygments.css">
+  <link rel="shortcut icon" href="../../static/favicon.png?h=fa09bedd">
+  <title>lektor 操作 | Lektor Static Content Management System</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../">Lektor</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li><a href="../../downloads/">Download</a></li>
+          
+            <li><a href="../../docs/">Documentation</a></li>
+          
+            <li><a href="../../showcase/">Showcase</a></li>
+          
+            <li><a href="../../plugins/">Plugins</a></li>
+          
+            <li><a href="../../community/">Community</a></li>
+          
+            <li><a href="../../blog/">Blog</a></li>
+          
+            <li class="active"><a href="../">Program</a></li>
+          
+            <li><a href="../../about/">About</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+    <div class="container">
+      
+  <div class="row">
+    <div class="col-sm-3">
+      
+  
+    
+  
+  <ul class="tree-nav nocontent">
+    <li><a href="../">编程</a></li>
+    
+      <li><a href="../conda/">Conda 环境管理</a>
+        
+      </li>
+    
+      <li class="active"><a href="./">lektor 操作</a>
+        
+        <ul></ul>
+        
+      </li>
+    
+  </ul>
+
+    </div>
+    <div class="col-sm-9 doc-styling">
+      <h1>lektor 操作</h1>
+      
+      <h1 id="quick-start">Quick start</h1><p>安装库：</p>
+<pre><code>pip install lektor
+</code></pre>
+<p>初始化：</p>
+<pre><code>lektor quickstart
+</code></pre>
+<p>启动服务：</p>
+<pre><code>lektor server
+uv run lektor server -f webpack
+</code></pre>
+<h1 id="mdxie-zuo-ge-shi">MD写作格式</h1><p>创建 contents.lr 文件</p>
+<pre><code>title: 我的第一篇博客文章
+---
+pub_date: 2026-08-21
+---
+author: jcw
+---
+body:
+
+这里就是写 Markdown 的地方！
+
+## 一级标题
+你可以直接把原本 `.md` 文件里的内容整篇复制粘贴到这里。
+
+* 支持列表
+* 支持代码块
+* 支持图片与公式
+</code></pre>
+<h3 id="fang-fa-yi-wen-zhang-zhuan-shu-tu-pian-zui-tui-jian-zui-zheng-ji">方法一：文章专属图片（最推荐、最整洁 ⭐）</h3><p>Lektor 最强大的特性之一是<strong>附件机制（Attachments）</strong>，你可以把图片直接和文章放在同一个文件夹里，方便统一管理。</p>
+<h4 id="1-fang-zhi-tu-pian">1. 放置图片</h4><p>把你的图片（例如 pic.png）直接放到该文章的目录下：</p>
+<pre><code>blog/
+└── test/
+    ├── contents.lr
+    └── pic.png       &lt;-- 直接把图片扔到这里
+</code></pre>
+<h4 id="2-zai-markdown-zhong-yin-yong">2. 在 Markdown 中引用</h4><p>在 contents.lr 的 body 区域直接用标准 Markdown 语法写图片名即可（无需写复杂的绝对路径）：</p>
+<pre><code>body:
+
+这是我的文章正文。
+
+![图片描述](pic.png)
+</code></pre>
+<blockquote>
+<p><strong>💡 在后台操作更简单</strong>：
+如果你在浏览器后台 <a href="http://localhost:5000/admin">http://localhost:5000/admin</a> 里编辑文章，页面下方有一个 <strong>Attachments（附件）</strong> 区域，你可以直接把图片<strong>拖拽上传</strong>进去，然后在编辑框里写 描述 即可。</p>
+</blockquote>
+<hr />
+<h3 id="fang-fa-er-quan-ju-gong-gong-tu-pian-ru-tou-xiang-gong-gong-cha-tu">方法二：全局公共图片（如头像、公共插图）</h3><p>如果你有一些所有文章都会用到的公共图片（比如 Logo、博客头像）：</p>
+<h4 id="1-fang-zhi-tu-pian">1. 放置图片</h4><p>放到项目根目录的 <strong>assets/</strong> 文件夹下（例如 assets/images/）：</p>
+<pre><code>你的项目根目录/
+├── assets/
+│   └── images/
+│       └── logo.png  &lt;-- 放在这里
+├── content/
+└── ...
+</code></pre>
+<h4 id="2-zai-markdown-zhong-yin-yong">2. 在 Markdown 中引用</h4><p>使用以 / 开头的绝对路径：</p>
+<pre><code>body:
+![站点Logo](/images/logo.png)
+</code></pre>
+<h3 id="fang-fa-san-shi-yong-wai-bu-wang-luo-tu-pian-tu-chuang">方法三：使用外部网络图片（图床）</h3><p>如果你使用的是网络上的图片链接或自己搭建的图床，直接使用完整的 HTTP/HTTPS 链接即可：</p>
+<pre><code>body:
+![网络图片](https://example.com/images/sample.jpg)
+</code></pre>
+
+    </div>
+  </div>
+
+    </div>
+    
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/lektor/lektor/" title="Lektor on GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/program/lektor/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../license/">License & Copyright</a> •
+          <a href="../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>

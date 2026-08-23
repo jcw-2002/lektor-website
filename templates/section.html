@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% from "macros/section.html" import render_sidebar %}
+{% block title %}{{ this.title }}{% endblock %}
+{% block body %}
+  <div class="row">
+    <div class="col-sm-3">
+      {{ render_sidebar(this) }}
+    </div>
+    <div class="col-sm-9 doc-styling">
+      <h1>{{ this.title }}</h1>
+      {% if this.summary %}
+        <p class="summary">{{ this.summary }}</p>
+      {% endif %}
+      {{ this.body }}
+    </div>
+  </div>
+{% endblock %}

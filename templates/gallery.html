@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% block title %}{{ this.name or "Gallery" }}{% endblock %}
+{% block outerbody %}
+  {% if this != site.root and this.parent %}
+    {% set banner = this.attachments.images.first() %}
+  {% else %}
+    {% set banner = site.get('/gallery').attachments.images.first() %}
+  {% endif %}
+  {% if banner %}
+    <div class="page-banner page-banner-300" style="background-image: url({{ banner|url }})"></div>
+  {% endif %}
+  {{ super() }}
+{% endblock %}
+{% block body %}
+  {% if this.parent and this.parent != site.root %}
+    <div class="showcase-site back-link">
+      <a href="{{ this.parent|url }}">« Back to {{ this.parent.name or 'Gallery' }}</a>
+    </div>
+  {% endif %}
+  <h1>{{ this.name or "Gallery" }}</h1>
+  {% if this.description %}
+    {{ this.description }}
+  {% endif %}
+
+  {% if this.children %}
+    <div class="gallery"
+      {% if this.columns %}style="--gallery-cols: {{ this.columns }}"{% endif %}>
+      {% for item in this.children %}
+        {# 判断点击目标：
+           - 子目录（gallery，有 children）→ 跳到子目录内页
+           - 叶子（gallery-item）有 url 字段 → 跳到外部 URL（新窗口）
+           - 叶子无 url → 跳到详情页 #}
+        {% set is_subgallery = item.children %}
+        {% set has_external = item.url and not is_subgallery %}
+        {% if has_external %}
+          {% set target_href = item.url %}
+          {% set target_attrs = ' target="_blank" rel="noopener noreferrer"' %}
+        {% else %}
+          {% set target_href = item|url %}
+          {% set target_attrs = '' %}
+        {% endif %}
+        <div class="gallery-item">
+          <a href="{{ target_href }}"{{ target_attrs | safe }}>
+            <h2>{{ item.name or item.title or item._path }}</h2>
+            {% set img = item.attachments.images.first()
+                 if not item.cover_image
+                 else item.attachments.get(item.cover_image) %}
+            {% if img %}
+              <div class="frame">
+                <img src="{{ img.thumbnail(480)|url }}" alt="">
+              </div>
+            {% endif %}
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p><em>This gallery is empty. Add sub-pages inside it.</em></p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,7 @@
+_model: gallery
+---
+name: AI
+---
+cover_image: cover.png
+---
+columns: 5

@@ -1,0 +1,8 @@
+name: Sample Two
+---
+description:
+Another sample gallery item. Add as many sub-folders as you like.
+---
+url: https://example.com
+---
+cover_image: cover.png

@@ -1,0 +1,30 @@
+{#
+  Reusable sidebar (tree navigation) for section-style columns.
+
+  The root of the tree is resolved from the page's `root_path` field:
+    - if `root_path` is set, that path is used as the tree root;
+    - otherwise the page itself is treated as the root.
+
+  This keeps the macro reusable across columns without hardcoding paths
+  and avoids relying on unsupported Jinja extensions.
+#}
+
+{% macro render_sidebar(page) %}
+  {% if page.root_path %}
+    {% set root = site.get(page.root_path) or page %}
+  {% else %}
+    {% set root = page %}
+  {% endif %}
+  <ul class="tree-nav nocontent">
+    <li{% if page._path == root._path %} class="active"{% endif
+      %}><a href="{{ root|url }}">{{ root.title }}</a></li>
+    {% for child in root.children recursive %}
+      <li{% if page._path == child._path %} class="active"{% endif
+          %}><a href="{{ child|url }}">{{ child.title }}</a>
+        {% if page.is_child_of(child) %}
+        <ul>{{ loop(child.children) }}</ul>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% endmacro %}

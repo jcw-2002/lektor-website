@@ -1,0 +1,119 @@
+_model: section-page
+---
+title: Conda 环境管理
+---
+root_path: /program/
+---
+pub_date: 2026-08-21
+---
+author: jcw
+---
+body:
+
+这是一份简洁实用的 **Conda 环境管理常用命令** Markdown 速查文档：
+
+```markdown
+# Conda 环境管理常用命令速查
+
+
+## 1. 查看环境
+
+- **查看所有已存在的环境**：
+  ```bash
+  conda env list
+  # 或
+  conda info --envs
+  ```
+
+
+## 2. 创建环境
+
+- **创建基础环境**：
+  ```bash
+  conda create -n <环境名>
+  ```
+- **创建指定 Python 版本的环境**（推荐）：
+  ```bash
+  conda create -n <环境名> python=3.10
+  ```
+- **创建环境的同时安装指定包**：
+  ```bash
+  conda create -n <环境名> python=3.9 numpy pandas
+  ```
+
+
+## 3. 激活与退出环境
+
+- **激活/切换到指定环境**：
+  ```bash
+  conda activate <环境名>
+  ```
+- **退出当前环境**（返回 base 或系统环境）：
+  ```bash
+  conda deactivate
+  ```
+
+
+## 4. 删除与克隆环境
+
+- **删除指定环境及其所有依赖**：
+  ```bash
+  conda env remove -n <环境名>
+  # 或
+  conda remove -n <环境名> --all
+  ```
+- **克隆（复制）已有环境**：
+  ```bash
+  conda create -n <新环境名> --clone <旧环境名>
+  ```
+
+
+## 5. 环境导出与迁移
+
+- **导出当前环境配置到 YAML 文件**：
+  ```bash
+  conda env export > environment.yml
+  ```
+  *(跨平台建议只导出主要依赖，去除平台专属构建编号)*：
+  ```bash
+  conda env export --no-builds > environment.yml
+  ```
+- **通过 YAML 文件快速重建环境**：
+  ```bash
+  conda env create -f environment.yml
+  ```
+
+
+## 6. 环境内常用包管理
+
+> **提示**：需先激活对应环境，或在命令后加上 `-n <环境名>`。
+
+- **查看当前环境安装的所有包**：
+  ```bash
+  conda list
+  ```
+- **安装包**：
+  ```bash
+  conda install <包名>
+  # 从指定源（如 conda-forge）安装
+  conda install <包名> -c conda-forge
+  ```
+- **卸载包**：
+  ```bash
+  conda remove <包名>
+  ```
+- **更新包**：
+  ```bash
+  conda update <包名>
+  ```
+
+
+
+## 7. 缓存与垃圾清理
+
+长期使用后，下载包的缓存会占用大量磁盘空间：
+
+- **清理所有未使用的缓存包和索引**：
+  ```bash
+  conda clean --all
+  ```

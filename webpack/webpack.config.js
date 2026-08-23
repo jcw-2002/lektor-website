@@ -29,7 +29,18 @@ const options = {
       },
       {
         test: /\.scss$/,
-        use: [MiniCssExtractPlugin.loader, "css-loader", "sass-loader"],
+        use: [
+          MiniCssExtractPlugin.loader,
+          "css-loader",
+          {
+            loader: "sass-loader",
+            options: {
+              sassOptions: {
+                quietDeps: true, // 👈 忽略第三方包（如 font-awesome）的 Sass 弃用警告
+              },
+            },
+          },
+        ],
       },
       {
         test: /\.css$/,

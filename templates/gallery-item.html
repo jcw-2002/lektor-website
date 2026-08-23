@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block title %}{{ this.name }}{% endblock %}
+{% block outerbody %}
+  <div class="container showcase-site">
+    <div class="row">
+      <div class="back-link">
+        <a href="{{ this.parent|url }}">Back to Gallery</a>
+      </div>
+      <h1>{{ this.name }}</h1>
+      {% if this.url %}
+        <p class="site-link"><a href="{{ this.url }}" target="_blank" rel="noopener noreferrer">{{ this.url }}</a>
+      {% endif %}
+    </div>
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        {{ this.description }}
+      </div>
+    </div>
+  </div>
+{% endblock %}

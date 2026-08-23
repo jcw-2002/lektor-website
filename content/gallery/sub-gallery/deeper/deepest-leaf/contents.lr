@@ -1,0 +1,10 @@
+_model: gallery-item
+---
+name: Deepest Leaf
+---
+description:
+This proves infinite nesting works - three levels deep.
+---
+url: https://example.com
+---
+cover_image: cover.png

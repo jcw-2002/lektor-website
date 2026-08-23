@@ -1,0 +1,7 @@
+_model: gallery
+---
+name: Sub Gallery
+---
+cover_image: cover.png
+---
+columns: 3

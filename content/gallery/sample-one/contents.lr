@@ -1,0 +1,8 @@
+name: Sample One
+---
+description:
+A sample gallery item. Replace this text and image with your own content.
+---
+url: https://example.com
+---
+cover_image: cover.png

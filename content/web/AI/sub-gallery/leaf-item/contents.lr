@@ -1,0 +1,10 @@
+_model: gallery-item
+---
+name: A Leaf Item
+---
+description:
+This is a leaf gallery item - a dead end with an image and description.
+---
+url: https://example.com
+---
+cover_image: cover.png
