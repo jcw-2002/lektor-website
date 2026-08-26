@@ -41,7 +41,7 @@
         {% endif %}
         <div class="gallery-item">
           <a href="{{ target_href }}"{{ target_attrs | safe }}>
-            <h2>{{ item.name or item.title or item._path }}</h2>
+            <h2 title="{{ item.name or item.title or item._path }}">{{ item.name or item.title or item._path }}</h2>
             {% set img = item.attachments.images.first()
                  if not item.cover_image
                  else item.attachments.get(item.cover_image) %}

@@ -1,12 +1,15 @@
 {#
   Reusable sidebar (tree navigation) for section-style columns.
+  Grouped rendering:
+    - Articles with a `category` are grouped under that category name.
+    - Each group is a native <details> (HTML5 collapse, no JS); the group
+      containing the current page is auto-expanded.
+    - Articles WITHOUT a category (empty/null) are NOT grouped:
+      they are rendered flat, directly after all category groups.
+      (null is not a category; multiple null articles simply stay as siblings.)
 
-  The root of the tree is resolved from the page's `root_path` field:
-    - if `root_path` is set, that path is used as the tree root;
-    - otherwise the page itself is treated as the root.
-
-  This keeps the macro reusable across columns without hardcoding paths
-  and avoids relying on unsupported Jinja extensions.
+  Backward compatible:
+    - No category field -> article still shows, just flat at the bottom.
 #}
 
 {% macro render_sidebar(page) %}
@@ -15,16 +18,65 @@
   {% else %}
     {% set root = page %}
   {% endif %}
+
+  {# Build (title, path, category) tuples for root's immediate children. #}
+  {% set ns = namespace(items=[], flat=[]) %}
+  {% for child in root.children %}
+    {% set cat = child.category %}
+    {% if cat %}
+      {% set ns.items = ns.items + [(child.title, child._path, cat)] %}
+    {% else %}
+      {% set ns.flat = ns.flat + [(child.title, child._path, '')] %}
+    {% endif %}
+    {% for sub in child.children %}
+      {% set subcat = sub.category or cat %}
+      {% if subcat %}
+        {% set ns.items = ns.items + [(sub.title, sub._path, subcat)] %}
+      {% else %}
+        {% set ns.flat = ns.flat + [(sub.title, sub._path, '')] %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+
+  {# Ordered unique categories, in first-appearance order. #}
+  {% set cat_ns = namespace(seen=[], order=[]) %}
+  {% for _, _, c in ns.items %}
+    {% if c not in cat_ns.seen %}
+      {% set cat_ns.seen = cat_ns.seen + [c] %}
+      {% set cat_ns.order = cat_ns.order + [c] %}
+    {% endif %}
+  {% endfor %}
+
   <ul class="tree-nav nocontent">
     <li{% if page._path == root._path %} class="active"{% endif
       %}><a href="{{ root|url }}">{{ root.title }}</a></li>
-    {% for child in root.children recursive %}
-      <li{% if page._path == child._path %} class="active"{% endif
-          %}><a href="{{ child|url }}">{{ child.title }}</a>
-        {% if page.is_child_of(child) %}
-        <ul>{{ loop(child.children) }}</ul>
+
+    {% for cat in cat_ns.order %}
+      {% set grp_ns = namespace(active=False) %}
+      {% for title, pth, c in ns.items %}
+        {% if c == cat and (page._path == pth or page.is_child_of(site.get(pth))) %}
+          {% set grp_ns.active = True %}
         {% endif %}
+      {% endfor %}
+      <li class="tree-group">
+        <details{% if grp_ns.active %} open{% endif %}>
+          <summary class="tree-group-title">{{ cat }}</summary>
+          <ul class="tree-group-items">
+            {% for title, pth, c in ns.items %}
+              {% if c == cat %}
+                <li{% if page._path == pth %} class="active"{% endif
+                  %}><a href="{{ pth|url }}">{{ title }}</a></li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+        </details>
       </li>
+    {% endfor %}
+
+    {# Flat (uncategorized) articles, directly after all groups. #}
+    {% for title, pth, c in ns.flat %}
+      <li{% if page._path == pth %} class="active"{% endif
+        %}><a href="{{ pth|url }}">{{ title }}</a></li>
     {% endfor %}
   </ul>
 {% endmacro %}

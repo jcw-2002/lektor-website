@@ -4,129 +4,59 @@ title: Welcome
 ---
 body:
 
-#### banner ####
-image: header.jpg
-----
-height: 500-tall
-----
-contents:
 
-<div class="container lektor-intro">
-  <div class="row">
-    <div class="col-md-8">
-      <img src="logo.png" alt="Lektor" class="logo">
-      <p>
-	A flexible and powerful static content management system for building
-	complex and beautiful websites out of flat files — for people who do
-        not want to make a compromise between a CMS and a static blog engine.
-      <p>
-        Getting your ideas implemented is as easy as frying an egg.
-    </div>
-    <div class="col-md-4 visible-md-block visible-lg-block">
-      <div class="download-btn"><a href="downloads/"
-        ><i class="glyphicon glyphicon-download-alt"></i> Download Lektor</a></div>
-    </div>
-  </div>
-</div>
+
+
 #### text-block ####
 text:
+![图片](/images/introduction/me.jpg "me")
 
-<div class="badges">
-  <ul>
-    <li><a href="https://twitter.com/getlektor"
-      class="twitter-follow-button" data-show-count="false"
-      data-size="large" data-dnt="true">Follow @getlektor</a>
-    </li>
-    <li><a class="github-button" href="https://github.com/lektor/lektor"
-      data-style="mega" data-count-href="/lektor/lektor/stargazers"
-      data-count-api="/repos/lektor/lektor#stargazers_count"
-      data-count-aria-label="# stargazers on GitHub"
-      aria-label="Star lektor/lektor on GitHub">Star</a>
-    </li>
-    <li><a href="https://gitter.im/lektor/lektor"
-      class="js-gitter-toggle-chat-button"><img
-      src="https://badges.gitter.im/lektor/lektor.svg"
-      alt="Join the chat at https://gitter.im/lektor/lektor"></a>
-    </li>
-  </ul>
-</div>
-----
-class: default
-#### text-block ####
-text:
+## W JC
 
-## Full of Features
+## 📮 基本信息  
+- **联系方式**： QQ: 1012386834 | <zx1012386834@outlook.com>  
+- **地址**：重庆  
+- **GitHub**: [jcw-2002](https://github.com/jcw-2002)  
+- **技术博客**: [我的技术笔记](https://www.wanjc.top/)  
 
-* <i class="feature-circle fa fa-ship"></i> **Deploy Anywhere** Because Lektor
-  builds out 100% static HTML you can deploy them to any host (including S3,
-  GitHub Pages, any web host, etc.).
-* <i class="feature-circle fa fa-globe"></i> **Cross Platform** It runs on
-  Linux, OSX and Windows.
-* <i class="feature-circle fa fa-file-code-o"></i> **100% File Based** All
-  source data is well structured and can be tracked in a version control
-  system or cloud storage like Dropbox.
-* <i class="feature-circle fa fa-database"></i> **Flat-File Database** All
-  source data is stored in a flat-file tree database and can be freely
-  queried. The layout of that data is completely configurable.
-* <i class="feature-circle fa fa-pencil"></i> **Customizable Admin** Lektor
-  comes fully equipped with a flexible and beautiful admin interface so you can
-  edit your pages without having to touch the raw sources.
-* <i class="feature-circle fa fa-code-fork"></i> **Dependency Tracking**
-  The build process intelligently tracks page dependencies such that it only
-  rebuilds pages that have changed.
-* <i class="feature-circle fa fa-image"></i> **Image Tools** Create
-  thumbnails and give convenient access to EXIF data.
-* <i class="feature-circle fa fa-puzzle-piece"></i> **Plugin System** Lektor
-  supports loading plugins that can customize a wide range of functionality.
-* <i class="feature-circle fa fa-terminal"></i> **Python API** The build
-  system is written in Python and provides a documented API to extend it and
-  integrate into other apps.
-* <i class="feature-circle fa fa-language"></i> **Multilingual** We can
-  speak multiple languages and allow you to easily create localized websites.
-----
-class: two-column-list
-#### slideshow ####
-slides:
+## 🎓 教育背景  
+![图片](/images/introduction/ctbu_compressed.jpg "ctbu")
+### [重庆工商大学](https://www.ctbu.edu.cn/) | 信息管理与信息系统（本科）  
+**2021.09 - 2025.06**  
+- 主修课程：数据挖掘、数据库原理、机器学习
 
-##### slide #####
-description:
+![图片](/images/introduction/EIE_compressed.jpg "EIE")
+### [重庆大学国家卓越工程师学院](https://eie.cqu.edu.cn/index.htm) | 智能网联汽车（交流生）  
+**2024.09 - 2025.06**  
+- 毕设研究方向：自动驾驶关键场景生成   
 
-Lektor comes with a customizable admin panel that allows anyone to
-create and edit pages.
------
-image: edit-post.png
-##### slide #####
-description:
 
-The project files are neatly laid out in the filesystem and allow tracking
-via cloud storage like Dropbox or version control.
------
-image: filesystem.png
-##### slide #####
-description: Projects can be immediately published to remote servers from the admin panel.
------
-image: publish.png
-##### slide #####
-description:
+## 🏆  获奖经历
+```
+优秀毕业论文
+2024年（第12届）“泰迪杯”数据挖掘挑战赛（负责人）全国三等奖 
+第20届学科竞赛节之信息系统开发大赛 校级二等奖
+第19届学科竞赛节之信息系统开发大赛 校级二等奖
+第八届中国国际“互联网+”大学生创新创业大赛 院级优秀奖
+```
 
-Changes become immediately visible as Lektor rebuilds on demand.  A preview
-is also embedded in the admin interface.
------
-image: preview.png
-##### slide #####
-description:
+## 💻 技术能力  
+```
+大模型与 Agent 开发：
+熟练掌握 Prompt Engineering、Function Calling及 Agent 任务拆解设计；熟悉 LangChain 开发框架；熟悉常用向量检索工具与数据库。
+机器学习与深度学习：
+熟练掌握 Python 编程，熟练使用 Pandas、Numpy、Scikit-learn 进行经典机器学习算法构建。熟悉 PyTorch 框架，具备 YOLO 等计算机视觉模型的微调、部署经验。
+后端开发与工程服务：
+熟悉 FastAPI 后端开发框架；熟练掌握 SQL 语言与关系型数据库MySQL 操作；熟悉 Docker 容器化技术、Git 版本控制流以及 Selenium 网页自动化与数据抓取技术。
 
-The structure of the pages and the templates used to render the page can
-be completely customized.
------
-image: structure.png
-#### text-block ####
-text:
+CET-4 、WorldQuantBrain顾问
+```
 
-## Open Source
+## 📚 开源与写作
+[GitHub仓库](https://github.com/jcw-2002) 
 
-Lektor at its core is a three clause [BSD licensed
-](https://raw.githubusercontent.com/lektor/lektor/master/LICENSE) Open Source
-project written in Python and Node.js.
-----
-class: centered
+[数据挖掘竞赛代码](https://github.com/jcw-2002/competitions)
+学习期间所打的一些比赛，只有部分关键代码，省略了数据和一些无关紧要的代码
+
+[自动化爬虫工具集](https://github.com/jcw-2002/Crawler) 
+自学的爬虫，这些都是爬取成功并获得数据的网站，有些代码可能已经过时

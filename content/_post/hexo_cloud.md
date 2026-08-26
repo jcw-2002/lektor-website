@@ -1,0 +1,625 @@
+---
+title: Hexo 博客部署到云服务器完整教程
+categories:               #分类
+- 博客
+tags: 
+  - hexo
+  - 云服务器
+
+cover: img/article/hc_compressed.jpg
+date: 2025-06-02 15:30:00
+---
+
+详细记录 Hexo 博客从本地开发环境到云服务器自动化部署的完整过程，包括环境配置、Git 钩子设置和 Nginx 服务器配置。
+
+## 技术方案概述
+
+### 为什么选择 Hexo
+
+目前搭建博客的主流框架有 **WordPress**、**VuePress**、**Hugo**、**Hexo** 等等，我主要是感觉 Hexo 好看的主题比较多，生态完善，所以选择了这个静态博客框架。
+
+### 整体部署架构
+
+采用 **Git 钩子自动化部署** 方案，实现一键部署：
+
+```
+graph LR
+    A[本地 Hexo] -->|hexo deploy| B[远程 Git 仓库]
+    B -->|Git 钩子触发| C[自动部署脚本]
+    C -->|复制文件| D[Nginx 网站目录]
+    D -->|访问| E[用户浏览器]
+```
+
+**核心流程**：
+1. 🏠 **本地推送**：执行 `hexo deploy` 将生成的静态文件推送到远程 Git 仓库
+2. 🔄 **自动触发**：Git 仓库配置钩子脚本，接收推送后自动执行部署
+3. 📂 **文件同步**：将最新的静态文件强制覆盖到 Nginx 指定的工作目录
+4. 🌐 **对外服务**：Nginx 服务器配置访问根路径指向该工作目录
+
+## 本地环境准备
+
+### 基础环境安装
+
+#### 1. Node.js 和 Git 环境验证
+
+这两个工具是 Hexo 开发的基础依赖，确保已正确安装：
+
+```bash
+# 验证 Node.js 安装
+C:\Users\gzl>node -v
+v18.16.1
+
+# 验证 Git 安装
+C:\Users\gzl>git --version
+git version 2.39.0.windows.2
+```
+
+**验证要点**：
+- ✅ Node.js 版本建议 14.0 以上
+- ✅ Git 安装后右键菜单会出现 "Git Bash Here"
+- ✅ 确保 npm 命令可用
+
+#### 2. Hexo 框架安装与初始化
+
+**第一步：创建项目目录**
+
+```bash
+# 新建博客存储目录
+mkdir E:\MyBlog
+cd E:\MyBlog
+```
+
+**第二步：安装 Hexo 脚手架**
+
+```bash
+# 全局安装 Hexo 命令行工具
+npm install -g hexo-cli
+```
+
+**第三步：初始化 Hexo 项目**
+
+```bash
+# 创建新的 Hexo 项目
+hexo init myblogs
+cd myblogs
+
+# 安装项目依赖
+npm install
+```
+
+**项目结构说明**：
+```
+myblogs/
+├── _config.yml          # 站点配置文件
+├── package.json         # 依赖管理文件
+├── scaffolds/           # 文章模板目录
+├── source/              # 源文件目录
+│   ├── _posts/          # 文章目录
+│   └── ...
+├── themes/              # 主题目录
+└── public/              # 生成的静态文件目录
+```
+
+**第四步：本地测试运行**
+
+```bash
+# 启动本地服务器
+hexo server
+
+# 访问 http://localhost:4000/ 验证
+```
+
+看到 Hexo 默认页面说明本地环境配置成功！ 🎉
+
+### 部署插件安装
+
+```bash
+# 安装 Git 部署插件
+npm install hexo-deployer-git --save
+
+# 安装本地服务器插件
+npm install hexo-server --save
+```
+
+## 云服务器环境配置
+
+### Nginx 服务器配置
+
+#### 1. 安装 Nginx
+
+```bash
+# CentOS/RHEL 系统
+yum install nginx
+
+# 验证安装
+nginx -v
+```
+
+#### 2. 创建部署目录
+
+```bash
+# 创建 Hexo 部署目录
+mkdir -p /data/hexo
+```
+
+#### 3. 配置 Nginx 主配置文件
+
+编辑 `/etc/nginx/nginx.conf`：
+
+```nginx
+user  nginx;
+worker_processes  auto;
+
+error_log  /var/log/nginx/error.log notice;
+pid        /var/run/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile        on;
+    keepalive_timeout  65;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+```
+
+#### 4. 配置站点虚拟主机
+
+编辑 `/etc/nginx/conf.d/default.conf`：
+
+**场景一：仅使用 IP 访问**
+
+```nginx
+server {
+    listen        80;
+    listen   [::]:80;
+    server_name  你的公网IP;
+
+    location / {
+        root   /data/hexo;
+        index  index.html index.htm;
+    }
+
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+}
+```
+
+**场景二：域名 + SSL 证书（推荐）**
+
+```nginx
+# HTTP 强制跳转 HTTPS
+server {
+    listen        80;
+    listen   [::]:80;
+    server_name  你的域名;
+
+    rewrite ^(.*)$ https://${server_name}$1 permanent;
+}
+
+# HTTPS 主站点配置
+server {
+    listen  443 ssl;
+    server_name  你的域名; 
+
+    ssl_certificate   /path/to/your/cert.pem;
+    ssl_certificate_key   /path/to/your/private.key;
+
+    ssl_session_cache   shared:SSL:1m;
+    ssl_session_timeout   5m;
+
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers   on;
+   
+    location / {
+        proxy_set_header   X-Real-IP        $remote_addr;
+        proxy_set_header   Host             $http_host;
+        proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
+        root   /data/hexo;
+        index  index.html index.htm;
+    }
+
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+}
+```
+
+#### 5. 启动 Nginx 服务
+
+```bash
+# 启动 Nginx
+nginx
+
+# 重启 Nginx
+nginx -s reload
+
+# 停止 Nginx
+nginx -s stop
+```
+
+### Node.js 环境配置
+
+```bash
+# 切换到根目录
+cd ~
+
+# 安装 Node.js
+curl -sL https://rpm.nodesource.com/setup_16.x | bash -
+yum install -y nodejs
+
+# 验证安装结果
+node -v
+npm -v
+```
+
+### Git 服务器配置
+
+#### 1. 安装 Git
+
+```bash
+# 安装 Git
+yum install git
+
+# 验证版本
+git --version
+```
+
+#### 2. 创建 Git 专用用户
+
+```bash
+# 创建 git 用户
+adduser git
+
+# 修改 sudoers 文件权限
+chmod 740 /etc/sudoers
+
+# 编辑 sudoers 文件
+vim /etc/sudoers
+```
+
+在 `root ALL=(ALL) ALL` 下方添加：
+```
+git ALL=(ALL) ALL
+```
+
+```bash
+# 恢复 sudoers 文件权限
+chmod 400 /etc/sudoers
+
+# 设置 git 用户密码
+sudo passwd git
+```
+
+#### 3. SSH 免密登录配置
+
+**服务器端操作**：
+
+```bash
+# 切换到 git 用户
+su git
+
+# 创建 SSH 目录
+cd ~
+mkdir .ssh
+```
+
+**本地端操作**：
+
+```bash
+# 生成 SSH 密钥对
+cd ~/.ssh
+ssh-keygen
+
+# 设置私钥权限
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/id_rsa 
+```
+
+**上传公钥到服务器**：
+
+将本地的 `id_rsa.pub` 文件上传到服务器的 `/home/git/.ssh/` 目录
+
+**服务器端配置**：
+
+```bash
+# 切换到 git 用户
+su git
+cd ~/.ssh
+
+# 设置公钥文件
+cp id_rsa.pub authorized_keys
+cat id_rsa.pub >> authorized_keys
+
+# 设置正确权限
+chmod 600 authorized_keys
+chmod 700 ~/.ssh
+
+# 设置 SELinux 标签（如果启用了 SELinux）
+restorecon -Rv ~/.ssh 
+```
+
+**测试免密登录**：
+
+```bash
+# 本地测试连接
+ssh -v git@你的服务器IP
+```
+
+看到成功连接说明 SSH 配置正确！ ✅
+
+#### 4. 创建 Git 裸仓库
+
+```bash
+# 切换到 git 用户
+su git
+cd ~
+
+# 创建裸仓库
+git init --bare hexo.git
+
+# 创建 Git 钩子脚本
+vim ~/hexo.git/hooks/post-receive
+```
+
+**钩子脚本内容**：
+```bash
+#!/bin/bash
+git --work-tree=/data/hexo --git-dir=/home/git/hexo.git checkout -f
+```
+
+**设置钩子权限**：
+```bash
+# 给钩子脚本执行权限
+chmod +x ~/hexo.git/hooks/post-receive
+
+# 设置部署目录权限
+sudo chmod -R 777 /data/hexo
+```
+
+## 本地项目配置与部署
+
+### 配置部署参数
+
+编辑本地 Hexo 项目的 `_config.yml` 文件：
+
+```yaml
+# 部署配置
+deploy:
+  type: git
+  repo: git@你的服务器IP:/home/git/hexo.git
+  branch: master
+```
+
+### 配置 Git 全局变量
+
+```bash
+# 设置 Git 用户信息
+git config --global user.email "your-email@example.com"
+git config --global user.name "your-name"
+```
+
+### 执行部署命令
+
+```bash
+# 清除缓存
+hexo clean
+
+# 生成静态文件
+hexo generate
+
+# 部署到服务器
+hexo deploy
+```
+
+## 部署流程详解
+
+### 完整部署流程
+
+```bash
+# 1. 清理之前的生成文件
+hexo clean
+
+# 2. 生成新的静态文件
+hexo g  # hexo generate 的简写
+
+# 3. 部署到远程服务器
+hexo d  # hexo deploy 的简写
+```
+
+### Git 钩子工作原理
+
+当执行 `hexo deploy` 时：
+
+1. **本地推送**：Hexo 将 `public/` 目录中的静态文件推送到服务器的 Git 仓库
+2. **钩子触发**：服务器接收到推送后，自动执行 `post-receive` 钩子
+3. **文件部署**：钩子脚本将文件检出到 `/data/hexo` 目录
+4. **服务生效**：Nginx 立即提供新的静态文件服务
+
+### 部署成功验证
+
+访问你的域名或服务器 IP，看到 Hexo 博客页面说明部署成功！ 🎊
+
+## 常见问题与解决方案
+
+### 1. SSH 连接失败
+
+**问题现象**：
+```bash
+ssh: connect to host xxx.xxx.xxx.xxx port 22: Connection refused
+```
+
+**解决方案**：
+```bash
+# 检查 SSH 服务状态
+systemctl status sshd
+
+# 启动 SSH 服务
+systemctl start sshd
+
+# 检查防火墙设置
+firewall-cmd --list-all
+```
+
+### 2. Git 钩子无执行权限
+
+**问题现象**：部署时没有错误，但文件未更新
+
+**解决方案**：
+```bash
+# 检查钩子文件权限
+ls -la ~/hexo.git/hooks/post-receive
+
+# 添加执行权限
+chmod +x ~/hexo.git/hooks/post-receive
+```
+
+### 3. Nginx 403 权限错误
+
+**问题现象**：访问网站出现 403 Forbidden
+
+**解决方案**：
+```bash
+# 检查目录权限
+ls -la /data/
+
+# 设置正确权限
+sudo chmod -R 755 /data/hexo
+
+# 检查 SELinux 状态
+getenforce
+
+# 临时关闭 SELinux（如果需要）
+setenforce 0
+```
+
+### 4. 端口被占用
+
+**问题现象**：Nginx 启动失败，端口 80/443 被占用
+
+**解决方案**：
+```bash
+# 查看端口占用
+netstat -tulnp | grep :80
+
+# 杀死占用进程
+kill -9 进程ID
+
+# 或修改 Nginx 监听端口
+vim /etc/nginx/conf.d/default.conf
+```
+
+## 高级优化建议
+
+### 1. 自动化脚本优化
+
+创建更智能的部署钩子 `/home/git/hexo.git/hooks/post-receive`：
+
+```bash
+#!/bin/bash
+
+# 设置变量
+WORK_TREE="/data/hexo"
+GIT_DIR="/home/git/hexo.git"
+
+# 记录部署开始时间
+echo "开始部署: $(date)" >> /var/log/hexo-deploy.log
+
+# 检出文件到工作目录
+git --work-tree=$WORK_TREE --git-dir=$GIT_DIR checkout -f
+
+# 设置正确的文件权限
+chown -R nginx:nginx $WORK_TREE
+chmod -R 755 $WORK_TREE
+
+# 重载 Nginx 配置
+nginx -s reload
+
+# 记录部署完成
+echo "部署完成: $(date)" >> /var/log/hexo-deploy.log
+echo "----------------------------------------" >> /var/log/hexo-deploy.log
+```
+
+### 2. 备份策略
+
+```bash
+# 创建自动备份脚本
+vim /home/git/backup-hexo.sh
+```
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/backup/hexo"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p $BACKUP_DIR
+tar -czf $BACKUP_DIR/hexo_backup_$DATE.tar.gz /data/hexo
+
+# 保留最近7天的备份
+find $BACKUP_DIR -name "hexo_backup_*.tar.gz" -mtime +7 -delete
+```
+
+### 3. 监控与日志
+
+```bash
+# 设置 Nginx 访问日志分析
+tail -f /var/log/nginx/access.log
+
+# 监控部署日志
+tail -f /var/log/hexo-deploy.log
+
+# 实时监控文件变化
+watch -n 1 'ls -la /data/hexo'
+```
+
+### 4. 性能优化
+
+**Nginx 性能调优**：
+
+```nginx
+# 在 http 块中添加
+gzip on;
+gzip_vary on;
+gzip_min_length 1024;
+gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+
+# 静态文件缓存
+location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}
+```
+
+## 总结
+
+通过本教程，我们成功实现了 Hexo 博客的自动化云服务器部署方案。这个方案的核心优势包括：
+
+### 技术特点
+
+1. **自动化程度高**：一次配置，终身受益
+2. **部署速度快**：Git 钩子秒级部署
+3. **稳定性强**：基于成熟的 Git + Nginx 技术栈
+4. **扩展性好**：可轻松添加多环境部署支持
+
+### 关键收益
+
+- 🚀 **开发效率提升**：本地写作，一键部署
+- 🔒 **安全性保障**：SSH 免密 + Git 版本控制
+- 📈 **性能优化**：静态文件 + Nginx 高性能服务
+- 🛠️ **运维简化**：自动化部署减少人工干预
+
+这套方案不仅解决了 Hexo 博客的部署问题，还为后续的博客运维和扩展奠定了坚实的基础。无论是个人博客还是团队文档站点，都可以基于这个方案进行定制和优化。

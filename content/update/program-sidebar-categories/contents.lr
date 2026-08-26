@@ -1,0 +1,135 @@
+title: Program 侧边栏分类折叠改动说明
+---
+summary: 在编程专栏左侧导航实现按分类分组、点击折叠展开的侧边栏，并兼容未分类文章平铺显示。
+---
+pub_date: 2026-08-26
+---
+author: jcw
+---
+body:
+
+#### text-block ####
+text:
+
+# Program 侧边栏分类折叠 改动总结
+
+> 项目路径：`f:\program\blog\lektor-website`
+
+## 一、需求背景
+
+用户基于 Lektor 博客系统，希望 `content/program`（编程专栏）左侧导航栏按"板块大类"分组展示文章：
+
+1. **按分类分组**：文章通过 `category` 字段归入某个大板块（如 `Python`、`博客`），侧边栏显示板块标题，隐藏其下的子文章。
+2. **点击折叠展开**：点击板块标题时向下展开该板块的文章列表。
+3. **未分类兼容**：如果文章**没有** `category`（null/空），则不分组，直接平铺显示在所有分类组之后，**不报错、不放进"未分类"组**（null 不是分类，可有多篇 null 文章）。
+
+## 二、核心机制
+
+Lektor 中一个页面由三部分协作：
+
+| 部分 | 作用 |
+|------|------|
+| `content/<path>/contents.lr` | 页面内容，用 `_model: xxx` 声明模型，并填写字段 |
+| `models/<model>.ini` | 定义模型字段、子项模型等 |
+| `templates/...` | 页面渲染模板 / 可复用 macro |
+
+关键点：
+
+- **折叠交互**：直接用 HTML5 原生 `<details>` / `<summary>` 元素实现展开收起，**无需任何 JS**。
+- **分类依据**：模型新增可选字段 `category`，模板按该字段分组。
+- **null 处理**：`category` 为空的文章不进分组，独立渲染为平铺条目放在所有分组之后。
+
+## 三、改动方案与涉及文件
+
+### 1. 新增 `category` 可选字段
+
+| 文件 | 说明 |
+|------|------|
+| `models/section-page.ini` | 在 `[fields]` 中新增 `category`（`type = string`，可选；留空即未分类） |
+
+### 2. 侧边栏 macro 按分类分组 + 折叠
+
+| 文件 | 说明 |
+|------|------|
+| `templates/macros/section.html` | 重写 `render_sidebar`：按 `category` 分组渲染 `<details>`；当前页所在分组自动展开；无 `category` 的文章平铺在所有分组之后 |
+
+分组逻辑：
+- 有 `category` 的文章 → 归入对应 `<details>` 折叠分组。
+- 无 `category`（null/空）的文章 → 不分组，直接平铺渲染在分组之后。
+- 有 `category` 但为其子级的文章，优先用子级自己的 `category`，否则继承父级。
+
+### 3. 折叠面板样式
+
+| 文件 | 说明 |
+|------|------|
+| `webpack/scss/main.scss` | 在 `ul.tree-nav` 块内追加分组折叠样式（隐藏默认 marker、加 `▸` 箭头、缩进子列表等） |
+| `assets/static/styles.css` | SCSS 编译产物（由 `npx webpack` 重新生成，改动 SCSS 后需重新构建） |
+
+### 4. 为现有文章填充 `category`（示例）
+
+| 文件 | category |
+|------|------|
+| `content/program/conda/contents.lr` | `Python` |
+| `content/program/hexo-cloud/contents.lr` | `博客` |
+| `content/program/hexo-vercel-deploy/contents.lr` | `博客` |
+| `content/program/hexo-bottom-quote-widget/contents.lr` | `博客` |
+
+> 其余（`git-update`、`lektor`、`mlink`、`swiper-fix`）不写 `category`，将平铺显示在分组之后。
+
+## 四、关键实现片段
+
+### 侧边栏分组渲染核心
+
+```jinja
+{# 无 category 的文章进入 flat，其余进入 items #}
+{% set ns = namespace(items=[], flat=[]) %}
+{% for child in root.children %}
+  {% set cat = child.category %}
+  {% if cat %}
+    {% set ns.items = ns.items + [(child.title, child._path, cat)] %}
+  {% else %}
+    {% set ns.flat = ns.flat + [(child.title, child._path, '')] %}
+  {% endif %}
+  {# ...子级类似处理#}
+{% endfor %}
+
+{# 每个分类一个原生折叠组 #}
+{% for cat in cat_ns.order %}
+  <li class="tree-group">
+    <details{% if grp_ns.active %} open{% endif %}>
+      <summary class="tree-group-title">{{ cat }}</summary>
+      <ul class="tree-group-items">
+        {# ...该分类下的文章链接 #}
+      </ul>
+    </details>
+  </li>
+{% endfor %}
+
+{# 未分类文章平铺在最后 #}
+{% for title, pth, c in ns.flat %}
+  <li{% if page._path == pth %} class="active"{% endif %}><a href="{{ pth|url }}">{{ title }}</a></li>
+{% endfor %}
+```
+
+## 五、效果示意
+
+```
+📁 编程                                ← 根，始终可见
+  ▸ Python                             ← 折叠分组
+      Conda 环境管理
+  ▸ 博客
+      Hexo 博客部署到云服务器完整教程
+      Hexo 博客零成本部署到 Vercel 完整指南
+      页面底部添加语句
+  git-update                           ← 未分类，平铺显示
+  lektor
+  mlink
+  swiper-fix
+```
+
+## 六、使用说明
+
+- **给文章加分类**：在 `content/program/<目录>/contents.lr` 里加一行 `category: 板块名`。
+- **不加分类**：不写 `category` 即可，文章会平铺显示在分组之后，不报错。
+- **修改 SCSS 后**：需重新执行 webpack 构建以更新 `assets/static/styles.css`，再刷新页面。
+- **当前页定位**：访问某篇文章时，其所属分组会自动展开。

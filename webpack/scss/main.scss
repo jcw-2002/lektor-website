@@ -603,6 +603,44 @@ ul.tree-nav {
       }
     }
 
+    > li.tree-group {
+      border-top: 1px solid #ddd;
+    }
+
+    > li.tree-group > details > summary.tree-group-title {
+      list-style: none;
+      cursor: pointer;
+      padding: 5px 10px;
+      font-weight: bold;
+      color: $toner;
+      user-select: none;
+
+      &::-webkit-details-marker { display: none; }
+      &::marker { display: none; content: ''; }
+
+      &::before {
+        content: '▸';
+        display: inline-block;
+        margin-right: 6px;
+        transition: transform 0.15s ease;
+      }
+    }
+
+    > li.tree-group > details[open] > summary.tree-group-title::before {
+      transform: rotate(90deg);
+    }
+
+    > li.tree-group > details > ul.tree-group-items {
+      list-style: none;
+      margin: 0;
+      padding: 0 0 0 18px;
+
+      > li {
+        border-top: 1px solid #ddd;
+        font-size: 14px;
+      }
+    }
+
     a {
       display: block;
       padding: 5px 10px;
@@ -781,16 +819,24 @@ div.showcase {
 
 div.gallery {
   display: grid;
+  width: 100%;
   // 默认 5 列；可通过页面字段 --gallery-cols 覆盖
-  grid-template-columns: repeat(var(--gallery-cols, 5), 1fr);
+  // 用 minmax(0, 1fr) 而不是 1fr，避免列被内容（如不换行的标题）撑大导致整体溢出
+  grid-template-columns: repeat(var(--gallery-cols, 5), minmax(0, 1fr));
   gap: 20px;
+
+  // 允许所有子项收缩到内容最小宽度以下，防止网格撑破容器
+  &,
+  * {
+    min-width: 0;
+  }
 
   // 窄屏时自动降为更少的列，保证可读性
   @media (max-width: $screen-sm-max) {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   @media (max-width: $screen-xs-max) {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   div.gallery-item {

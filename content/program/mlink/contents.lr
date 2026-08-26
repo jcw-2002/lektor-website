@@ -1,0 +1,404 @@
+_model: section-page
+---
+title: Hexo AnZhiYu主题友链页面自定义数据源功能实现
+---
+category: 博客
+---
+root_path: /program/
+---
+pub_date: 2026-06-01
+---
+author: jcw
+---
+body:
+
+## 前言
+
+在使用Hexo AnZhiYu主题时，我们经常需要创建各种列表页面，比如友情链接、在线工具推荐、番剧记录等。原本的设计中，如果页面使用 `type: link`，就会强制读取 `_data/link.yml` 文件，这限制了我们创建多样化页面的灵活性。
+
+今天分享一个功能改进：**通过添加 `page` 参数实现自定义数据源**，让友链模板可以复用于不同类型的页面。
+
+## 问题分析
+
+### 原有机制的局限性
+
+```yaml
+# 原有方式：所有 type: link 的页面都会读取 link.yml
+----
+title: 友情链接
+type: link
+----
+```
+
+这种设计存在以下问题：
+- 所有使用link模板的页面都会显示相同的友链数据
+- 无法创建独立的工具推荐、番剧记录等页面
+- 数据源固定，缺乏灵活性
+
+### 改进后的机制
+
+```yaml
+# 新方式：通过 page 参数指定数据源
+----
+title: 在线工具推荐
+type: link
+page: online  # 读取 _data/online.yml
+----
+```
+
+## 技术实现
+
+### 核心逻辑分析
+
+在 `flink.pug` 模板中，关键的判断逻辑如下：
+
+```javascript
+- const isCustomPage = page.page && page.page !== 'link'
+- const dataSource = isCustomPage ? site.data[page.page] : site.data.link
+- const pageTitle = isCustomPage ? (page.page === 'bangumis' ? '番剧' : page.page) : '友情链接'
+```
+
+**逻辑解释：**
+1. `isCustomPage`：判断是否为自定义页面（有page参数且不等于'link'）
+2. `dataSource`：根据是否为自定义页面选择对应的数据源
+3. `pageTitle`：动态设置页面标题，支持中文名称映射
+
+### 随机访问功能适配
+
+```javascript
+// 自定义页面随机访问按钮
+if isCustomPage && dataSource && dataSource.length > 0
+  a.banner-button.secondary.no-text-decoration(onclick=`customPageRandomVisit('${page.page}')`)
+    i.anzhiyufont.anzhiyu-icon-paper-plane1
+    span.banner-button-text 随机访问
+```
+
+随机访问功能也相应适配，确保不同页面的随机访问功能互不干扰。
+
+## 使用方法
+
+### 1. 创建数据文件
+
+在 `source/_data/` 目录下创建对应的 `.yml` 文件：
+
+```yaml
+# source/_data/online.yml
+- class_name: 开发工具
+  class_desc: 提升开发效率的在线工具
+  flink_style: anzhiyu
+  link_list:
+    - name: GitHub
+      link: https://github.com
+      avatar: github_compressed.jpg
+      descr: 全球最大的代码托管平台
+    - name: VSCode Online
+      link: https://vscode.dev
+      avatar: vscode_compressed.jpg
+      descr: 在线版VS Code编辑器
+
+- class_name: 设计工具  
+  class_desc: 设计师必备的在线工具
+  flink_style: telescopic
+  link_list:
+    - name: Figma
+      link: https://figma.com
+      avatar: figma_compressed.jpg
+      descr: 专业的UI/UX设计工具
+```
+
+### 2. 创建页面文件
+
+```markdown
+<!-- source/online/index.md -->
+----
+title: 在线工具推荐
+type: link
+page: online
+date: 2025-01-27 10:00:00
+----
+
+这里收集了各种实用的在线工具，帮助提升工作效率。
+```
+
+### 3. 支持的页面类型
+
+- **友情链接** (`type: link`)：默认读取 `link.yml`
+- **在线工具** (`page: online`)：读取 `online.yml`
+- **番剧记录** (`page: bangumis`)：读取 `bangumis.yml`，显示为"番剧"
+- **其他自定义** (`page: custom`)：读取 `custom.yml`
+
+## 功能特性
+
+### 1. 样式复用
+
+支持所有原有的友链样式：
+- `anzhiyu`：默认卡片样式
+- `telescopic`：望远镜样式
+- `flexcard`：弹性卡片样式
+
+### 2. 标题智能映射
+
+```javascript
+const pageTitle = isCustomPage ? 
+  (page.page === 'bangumis' ? '番剧' : page.page) : 
+  '友情链接'
+```
+
+特殊页面可以映射为中文名称，提升用户体验。
+
+### 3. 随机访问功能
+
+每个自定义页面都有独立的随机访问功能，互不干扰。
+
+### 4. 头像路径处理
+
+```javascript
+- let currentPage = isCustomPage ? page.page : 'link'
+- let avatarPath = `${currentPage}/${item.avatar}`
+```
+
+头像文件可以按页面类型分目录存放，便于管理。
+
+## 优势总结
+
+1. **灵活性**：一个模板支持多种页面类型
+2. **复用性**：减少重复代码，提高维护效率  
+3. **扩展性**：可以轻松添加新的页面类型
+4. **兼容性**：完全向后兼容原有的友链功能
+5. **用户体验**：支持中文标题、独立随机访问等功能
+
+## 实际应用场景
+
+- **工具导航站**：收集各种在线工具
+- **资源分享页**：分享学习资源、软件推荐
+- **项目展示**：展示个人项目或作品集
+- **番剧追踪**：记录追番进度和评价
+- **书单推荐**：分享读书心得和推荐
+
+## 总结
+
+通过这个功能改进，我们实现了友链模板的通用化，让一个模板可以服务于多种不同的页面需求。这不仅提高了代码的复用性，也为博客的内容组织提供了更大的灵活性。
+
+如果你也在使用AnZhiYu主题，不妨试试这个功能，相信会为你的博客增色不少！
+
+----
+
+*本文介绍的功能基于AnZhiYu主题的flink.pug模板实现，具体代码可能因版本而异，请以实际情况为准。*
+
+## 完整代码实现
+
+以下是 `flink.pug` 模板的完整代码，包含了所有自定义数据源功能的实现：
+
+```jade
+#article-container
+  - const isCustomPage = page.page && page.page !== 'link'
+  - const dataSource = isCustomPage ? site.data[page.page] : site.data.link
+  - const pageTitle = isCustomPage ? (page.page === 'bangumis' ? '番剧' : page.page) : '友情链接'
+  - const showLinkPageTop = (page.linkpagetop === true) || (page.linkpagetop === undefined && theme.linkPageTop && theme.linkPageTop.enable)
+  - const customTitle = page.linkpagetop_title || (theme.linkPageTop ? theme.linkPageTop.title : (isCustomPage ? `${pageTitle}记录` : "与数百名博主无限进步"))
+  
+  if showLinkPageTop
+    #flink-banners
+      .banner-top-box
+        .flink-banners-title
+          .banners-title-small=pageTitle
+          .banners-title-big=customTitle
+        .banner-button-group
+          if (theme.friends_vue.apiurl && !isCustomPage)
+            a.banner-button.secondary.no-text-decoration(onclick="friendChainRandomTransmission()")
+              i.anzhiyufont.anzhiyu-icon-paper-plane1
+              span.banner-button-text 随机访问
+          if isCustomPage && dataSource && dataSource.length > 0
+            a.banner-button.secondary.no-text-decoration(onclick=`customPageRandomVisit('${page.page}')`)
+              i.anzhiyufont.anzhiyu-icon-paper-plane1
+              span.banner-button-text 随机访问
+          if theme.linkPageTop.addFriendPlaceholder && theme.comments.use == 'Twikoo' && theme.twikoo.envId && !isCustomPage
+            a.banner-button.no-text-decoration(onclick="anzhiyu.addFriendLink()")
+              i.anzhiyufont.anzhiyu-icon-arrow-circle-right
+              span.banner-button-text 申请友链
+      if showLinkPageTop && ((page.linkpagetop === true) || (!isCustomPage))
+        #skills-tags-group-all
+          .tags-group-wrapper
+            - function getAvatarWithoutExclamationMark(url) {
+            -   const index = url.indexOf('!');
+            -   return index !== -1 ? url.substring(0, index) : url;
+            - }
+            each y in [1,2]
+              - const linkData = isCustomPage ? site.data[page.page] : site.data.link
+              each i, index in (linkData || []).slice(0, 15)
+                - const link_list = i.link_list.slice()
+                - const hundredSuffix = i.hundredSuffix ? i.hundredSuffix : ""
+                - const evenNum = link_list.filter((x, index) => index % 2 === 0);
+                - const oddNum = link_list.filter((x, index) => index % 2 === 1);
+                each item, index2 in link_list.slice(0, Math.min(evenNum.length, oddNum.length))
+                  - const index = index2 * 2
+                  if (index <= 15 && typeof evenNum[index] !== 'undefined' && typeof oddNum[index] !== 'undefined')
+                    - let oddNumAvatar = getAvatarWithoutExclamationMark(oddNum[index].avatar);
+                    - let evenNumAvatar = getAvatarWithoutExclamationMark(evenNum[index].avatar);
+                    - const currentPage = isCustomPage ? page.page : 'link'
+                    - oddNumAvatar = oddNumAvatar.startsWith('link/') ? oddNumAvatar : `${currentPage}/${oddNumAvatar}`
+                    - evenNumAvatar = evenNumAvatar.startsWith('link/') ? evenNumAvatar : `${currentPage}/${evenNumAvatar}`
+                    .tags-group-icon-pair
+                      a.tags-group-icon.no-text-decoration(href=url_for(evenNum[index].link), title=evenNum[index].name)
+                        img.no-lightbox(title=evenNum[index].name, src=url_for(evenNumAvatar + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=evenNum[index].name)
+                      a.tags-group-icon.no-text-decoration(href=url_for(oddNum[index].link), title=oddNum[index].name)
+                        img.no-lightbox(title=oddNum[index].name, src=url_for(oddNumAvatar + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=oddNum[index].name)
+  if theme.friends_vue && theme.friends_vue.enable && !isCustomPage
+    .title-h2-a
+      .title-h2-a-left
+        h2(style='padding-top:0;margin:.6rem 0 .6rem') 🎣 钓鱼
+        a.random-post-start.no-text-decoration(href='javascript:fetchRandomPost();')
+          i.anzhiyufont.anzhiyu-icon-arrow-rotate-right
+      .title-h2-a-right
+        a.random-post-all.no-text-decoration(href='/link/') 全部友链
+    #random-post
+    script(defer data-pjax src=url_for(theme.asset.random_friends_post_js))
+  
+  .flink
+    if dataSource
+      each i in dataSource
+        if i.class_name
+          h2!= i.class_name + "(" + i.link_list.length + ")"
+        if i.class_desc
+          .flink-desc!=i.class_desc
+        if i.flink_style === 'anzhiyu'
+          div(class=i.lost_contact ? 'anzhiyu-flink-list cf-friends-lost-contact' : 'anzhiyu-flink-list')
+            if i.link_list
+              each item in i.link_list
+                - let color = item.color || ""
+                - let tag = item.tag || ""
+                - let hundredSuffix = i.hundredSuffix ? i.hundredSuffix : ""
+                - let currentPage = isCustomPage ? page.page : 'link'
+                - let avatarPath = `${currentPage}/${item.avatar}`
+                
+                .flink-list-item
+                  if color == "vip" && tag
+                    span.site-card-tag.vip #[=tag]
+                      i.light
+                  else if color == "speed" && tag
+                    span.site-card-tag.speed #[=tag]
+                  else if tag
+                    span.site-card-tag(style=`background-color: ${color}`) #[=tag]
+                  else if item.recommend
+                    span.site-card-tag 荐
+                  if i.lost_contact
+                    a.cf-friends-link(href=url_for(item.link) title=item.name target="_blank")
+                      if theme.lazyload.enable
+                        img.no-lightbox(data-lazy-src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+                      else
+                        img.cf-friends-avatar.no-lightbox(src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+                      .flink-item-info
+                        .flink-item-name.cf-friends-name-lost-contact= item.name
+                  else
+                    a.cf-friends-link(href=url_for(item.link) cf-href=url_for(item.link) title=item.name target="_blank")
+                      if theme.lazyload.enable
+                        img.cf-friends-avatar.no-lightbox(data-lazy-src=url_for(avatarPath + hundredSuffix), cf-src=url_for(avatarPath + hundredSuffix), onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+                      else
+                        img.cf-friends-avatar.no-lightbox(src=url_for(avatarPath + hundredSuffix) cf-src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+                      .flink-item-info
+                        .flink-item-name.cf-friends-name= item.name
+                        .flink-item-desc(title=item.descr)= item.descr
+        
+        else if i.flink_style === 'telescopic'
+          .telescopic-site-card-group
+            each item in i.link_list
+              - let color = item.color || ""
+              - let tag = item.tag || ""
+              - let siteshot = item.siteshot || `https://image.thum.io/get/width/400/crop/800/allowJPG/wait/20/noanimate/${item.link}` || theme.default_img
+              - let hundredSuffix = i.hundredSuffix ? i.hundredSuffix : ""
+              - let currentPage = isCustomPage ? page.page : 'link'
+              - let avatarPath = `${currentPage}/${item.avatar}`
+              .site-card
+                if color == "vip" && tag
+                  span.site-card-tag.vip #[=tag]
+                    i.light
+                else if color == "speed" && tag
+                  span.site-card-tag.speed #[=tag]
+                else if tag
+                  span.site-card-tag(style=`background-color: ${color}`) #[=tag]
+                else if item.recommend
+                  span.site-card-tag 荐
+                a.img.no-text-decoration(target='_blank', title=`${item.name}`, href=`${item.link}`, rel='external nofollow')
+                  img.flink-avatar(data-lazy-src=siteshot, onerror=`this.onerror=null;this.src='${theme.default_img}'`, alt=item.name, style="pointer-events: none;", src=`${siteshot}`)
+                a.info.cf-friends-link.no-text-decoration(target='_blank', title=`${item.name}`, href=`${item.link}`, cf-href=url_for(item.link), rel='external nofollow')
+                  .site-card-avatar
+                    img.flink-avatar.cf-friends-avatar.no-fancybox(data-lazy-src=url_for(avatarPath + hundredSuffix), cf-src=url_for(avatarPath + hundredSuffix), onerror=`this.onerror=null;this.src='${theme.default_img}'`, alt=item.name, src=url_for(avatarPath + hundredSuffix))
+                  .site-card-text
+                    span.title.cf-friends-name #[=item.name]
+                    span.desc(title=`${item.descr}`) #[=item.descr]
+        else if i.flink_style === 'flexcard'
+          .flexcard-flink-list
+            each item in i.link_list
+              - let hundredSuffix = i.hundredSuffix ? i.hundredSuffix : ""
+              - let currentPage = isCustomPage ? page.page : 'link'
+              - let avatarPath = `${currentPage}/${item.avatar}`
+              a.flink-list-card.cf-friends-link(href=url_for(item.link) cf-href=url_for(item.link) target='_blank' data-title=item.descr)
+                .wrapper.cover
+                  - var siteshot = item.siteshot ? url_for(item.siteshot) : 'https://image.thum.io/get/width/400/crop/800/allowJPG/wait/20/noanimate/' + item.link
+                  if theme.lazyload.enable
+                    img.cover.fadeIn(data-lazy-src=siteshot onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.post_page) + `'` alt='cover' )
+                  else
+                    img.cover.fadeIn(src=siteshot onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.post_page) + `'` alt='cover' )    
+                .info
+                  if theme.lazyload.enable
+                    img.cf-friends-avatar.no-lightbox.flink-avatar(data-lazy-src=url_for(avatarPath + hundredSuffix) cf-src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt='cover' )
+                  else
+                    img.cf-friends-avatar.no-lightbox(src=url_for(avatarPath + hundredSuffix) cf-src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt='cover' )
+                  span.flink-sitename.cf-friends-name= item.name
+    != page.content
+    script.
+      // 自定义页面随机访问功能
+      function customPageRandomVisit(pageName) {
+        try {
+          const dataSource = !{JSON.stringify(dataSource)};
+          if (!dataSource || dataSource.length === 0) {
+            anzhiyu.snackbarShow('没有找到可访问的链接');
+            return;
+          }
+          
+          // 收集所有链接
+          let allLinks = [];
+          dataSource.forEach(category => {
+            if (category.link_list && Array.isArray(category.link_list)) {
+              category.link_list.forEach(item => {
+                if (item.link) {
+                  allLinks.push({
+                    name: item.name,
+                    link: item.link
+                  });
+                }
+              });
+            }
+          });
+          
+          if (allLinks.length === 0) {
+            anzhiyu.snackbarShow('没有找到可访问的链接');
+            return;
+          }
+          
+          // 随机选择一个链接
+          const randomIndex = Math.floor(Math.random() * allLinks.length);
+          const selectedLink = allLinks[randomIndex];
+          
+          anzhiyu.snackbarShow(`正在访问：${selectedLink.name}`, false, 2000);
+          
+          // 延迟跳转，让用户看到提示
+          setTimeout(() => {
+            window.open(selectedLink.link, '_blank');
+          }, 500);
+          
+        } catch (error) {
+          console.error('随机访问出错:', error);
+          anzhiyu.snackbarShow('随机访问功能出错');
+        }
+      }
+```
+
+## 文件说明
+
+这个 `flink.pug` 文件应该放置在以下路径：
+```
+f:\program\hexo\anzhiyu\themes\anzhiyu\layout\includes\page\flink.pug
+```
+
+使用时，只需要在你的页面 Front-matter 中添加相应的参数即可实现自定义数据源功能。

@@ -1,0 +1,152 @@
+title: Gallery 展示页面改动说明
+---
+summary: 基于 Lektor 博客实现可自定义列数的图片/链接展示页面，支持嵌套、跳转与 Showcase 复用。
+---
+pub_date: 2026-08-26
+---
+author: jcw
+---
+body:
+
+#### text-block ####
+text:
+
+# Gallery 展示页面改动总结
+
+> 项目路径：`f:\program\blog\lektor-website`
+
+## 一、需求背景
+
+用户希望基于 Lektor 博客系统，实现一个可自定义列数的图片/链接展示页面，并逐步演进出以下能力：
+
+1. **自定义列数**：一排显示 N 个格子（默认 5 列，可自由设置 1~6）。
+2. **图片自适应缩放**：图片固定高宽比、自动裁切，一排整齐。
+3. **无限嵌套**：点开一个 gallery 格子进入子 gallery，子 gallery 里还能再嵌 gallery（目录式）。
+4. **带封面缩略图**：嵌套的子 gallery 也有自己的名字和封面图。
+5. **点击跳转**：
+   - 叶子条目有 `url` → 直接跳转外部链接（新窗口）。
+   - 叶子条目无 `url` → 跳到详情页。
+   - 子目录（gallery）→ 跳到子页面继续浏览。
+6. **showcase 复用**：showcase 也改用可调列数的 Grid 布局，但保留原内容与导航。
+7. **修复 Web 页图标 404**：`content/web` 目录大写残留导致的 Lektor 构建缓存冲突。
+
+## 二、核心机制（Lektor 约定式）
+
+Lektor 中一个页面由三部分协作：
+
+| 部分 | 作用 |
+|------|------|
+| `content/<path>/contents.lr` | 页面内容，用 `_model: xxx` 声明使用哪个模型 |
+| `models/<model>.ini` | 定义模型字段、子项模型、字段必填等 |
+| `templates/<model>.html` | 页面渲染模板 |
+
+关键点：
+
+- **列数**：模板里用 CSS Grid + 变量 `--gallery-cols` 控制，`repeat(var(--gallery-cols, 5), 1fr)`。
+- **嵌套**：`[children] model = gallery-item` 是子项默认模型；子项可在自己的 `contents.lr` 里写 `_model: gallery` 覆盖成"子目录"，从而实现无限套娃。
+- **可选 url**：`url` 字段必须用 `type = string` 才能为空（`type = url` 时访问空值会报 `Missing URL` 错误）。
+
+## 三、改动方案与涉及文件
+
+### 1. 新建 Gallery 页面（可调列数 + 嵌套 + 跳转）
+
+| 文件 | 说明 |
+|------|------|
+| `models/gallery.ini` | Gallery 模型：含 `name`、`cover_image`、`columns` 字段；`[children] model = gallery-item` |
+| `models/gallery-item.ini` | 叶子条目模型：`name`、`url`（string 可选）、`cover_image`、`description` |
+| `templates/gallery.html` | 渲染模板：CSS Grid 布局；按子项类型决定点击目标（子目录内页 / 外部 URL / 详情页） |
+| `templates/gallery-item.html` | 叶子详情页模板：显示 name、description、可选外部链接 |
+| `content/gallery/contents.lr` | 页面入口，`_model: gallery`，`columns: 5` |
+| `content/gallery/sample-one|two|three/` | 示例叶子条目（临时演示） |
+| `content/gallery/sub-gallery/` | 嵌套子目录演示（含更深层嵌套） |
+
+### 2. Showcase 复用可调列数
+
+| 文件 | 改动 |
+|------|------|
+| `models/showcase.ini` | 新增 `columns` 字段 |
+| `templates/showcase.html` | 主体循环从 `batch(2)` + `col-md-6` 改为复用的 `.gallery` Grid 布局 |
+| `content/showcase/contents.lr` | 新增 `columns: 3` |
+
+### 3. Web 嵌套页面
+
+| 文件 | 说明 |
+|------|------|
+| `content/Web/` → `content/web/` | 顶层目录改为小写（其他顶层目录均为小写） |
+| `content/web/contents.lr` | `_model: gallery`，name、cover_image、columns |
+| `content/web/AI/contents.lr` | AI 子目录（gallery），含封面图 |
+| `content/web/AI/claude|deepseek|doubao|gemini|kimi|openai/` | 6 个叶子条目（各自有 url + 封面图） |
+| `content/web/AI/sub-gallery/` | 嵌套子目录演示 |
+| `content/web/Tools/` | Tools 子目录（gallery） |
+| `content/web/Tools/figma|github|notion/` | 工具叶子条目 |
+
+### 4. 样式（CSS Grid）
+
+| 文件 | 说明 |
+|------|------|
+| `webpack/scss/main.scss` | 新增 `div.gallery` 的 Grid 布局（可变列数、`aspect-ratio` 自适应缩放、hover 效果） |
+| `assets/static/styles.css` | SCSS 编译产物（已由 `npx webpack` 重新生成） |
+
+### 5. 导航
+
+| 文件 | 说明 |
+|------|------|
+| `databags/menu.ini` | 新增 `[gallery]`、`[links]` 导航项 |
+
+### 6. Web 图标 404 修复（大小写缓存冲突）
+
+| 文件/位置 | 说明 |
+|------|------|
+| `content/Web` → `content/web` | 顶层目录改小写 |
+| `content/web/AI/cover.png` | 补齐 AI 封面图（修复 `cover_image: cover.png` 引用不存在的文件） |
+| `C:\Users\jcw\AppData\Local\Lektor\Cache\builds\e8b1...\` | **删除 Lektor server 系统缓存 build 目录**，清除旧的大写 `Web` 残留记录 |
+
+> 根因：早期用大写 `Web` 目录跑过 `lektor server`，其默认输出路径 `%LOCALAPPDATA%\Lektor\Cache\builds\<id>\` 的 buildstate 记录了 `Web/...` 大写路径；改成小写 `web` 后新旧记录冲突，prune 阶段误删图片 → 图标 404。
+
+## 四、关键实现片段
+
+### Gallery 模板核心（点击目标判断）
+
+```jinja
+{% set is_subgallery = item.children %}
+{% set has_external = item.url and not is_subgallery %}
+{% if has_external %}
+  {% set target_href = item.url %}
+  {% set target_attrs = ' target="_blank" rel="noopener noreferrer"' %}
+{% else %}
+  {% set target_href = item|url %}
+  {% set target_attrs = '' %}
+{% endif %}
+<a href="{{ target_href }}"{{ target_attrs | safe }}>
+  <h2>{{ item.name }}</h2>
+  <img src="{{ img.thumbnail(480)|url }}" alt="">
+</a>
+```
+
+### CSS Grid 可变列数
+
+```scss
+div.gallery {
+  display: grid;
+  grid-template-columns: repeat(var(--gallery-cols, 5), 1fr);
+  gap: 20px;
+  img {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+  }
+}
+```
+
+## 五、使用说明
+
+- **调整列数**：修改 `content/<gallery或web或links>/contents.lr` 里的 `columns: N`。
+- **叶子跳外链**：子项 `contents.lr` 写 `url: https://...`；不写则跳详情页。
+- **嵌套子目录**：子项 `contents.lr` 写 `_model: gallery` 即可继续嵌套。
+- **每次改动后**：重启 `uv run lektor server -f webpack`（如涉及新图片，重启以生成缩略图）。
+
+## 六、遗留 / 待确认
+
+- `content/web` 与新建的 `content/links` 并存；若统一用 links，可删除 `content/web` 并移除 `menu.ini` 的 `[web]`。
+- `content/gallery` 下的 `sample-one/two/three` 为临时示例，可按需删除。
+- Tools 目录封面图当前为占位图，建议替换为真实图标。
