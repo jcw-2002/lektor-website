@@ -1,51 +1,41 @@
-name: "Deploy site"
+name: Deploy Lektor Site
 
 on:
-  pull_request:
-    branches:
-      - "*"
   push:
     branches:
-      - "master"
-  workflow_dispatch:
-    # Allow manually running workflow
-  schedule:
-    - cron: "23 2 * * *"
-
-env:
-  DEPLOY: >-
-    ${{
-    github.event_name != 'pull_request'
-    &&
-    github.ref == 'refs/heads/master'
-    }}
-  OUTPUT: _html
+      - main  # 如果你的默认主分支是 master，请改为 master
 
 jobs:
-  build:
-    name: Build lektor website
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: "lts/*"
-      - uses: astral-sh/setup-uv@v7
+          python-version: '3.11'
 
-      - name: Build lektor website
-        run: uv run lektor build -f webpack -O '${{ env.OUTPUT }}'
+      - name: Install Lektor
+        run: |
+          python -m pip install --upgrade pip
+          pip install lektor
+          # 如果你的项目有额外的 requirements.txt，可取消下行注释
+          # if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Check for broken internal links
-        uses: wjdp/htmltest-action@master
+      - name: Build site with Lektor
+        run: |
+          lektor build --output-path ./dist
+
+      - name: Deploy to Ubuntu Server
+        uses: easingthemes/ssh-deploy@main
         with:
-          path: ${{ env.OUTPUT }}
-          config: .htmltest.yml
-          skip_external: true
-          log_level: 1
-
-      - name: Deploy lektor website
-        if: env.DEPLOY == 'true'
-        run: uv run lektor deploy -O '${{ env.OUTPUT }}' ghpages-https
-        env:
-          LEKTOR_DEPLOY_USERNAME: lektor
-          LEKTOR_DEPLOY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          ARGS: "-rlgoDzvc -i --delete"
+          SOURCE: "dist/"
+          REMOTE_HOST: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: "/var/www/wanjc.top"
+          EXCLUDE: "/dist/, /node_modules/"
