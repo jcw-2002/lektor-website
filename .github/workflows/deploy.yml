@@ -3,7 +3,7 @@ name: Deploy Lektor Site
 on:
   push:
     branches:
-      - main  # 如果你的默认主分支是 master，请改为 master
+      - main
     workflow_dispatch:
 
 jobs:
