@@ -3,7 +3,7 @@ name: Deploy site
 on:
   push:
     branches:
-      - main  # 如果你的默认分支叫 master，请改成 master
+      - main  # 如果默认分支是 master，请改成 master
   workflow_dispatch:
 
 jobs:
@@ -11,27 +11,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 完整拉取 Git 历史（防止部分页面因缺少 git 记录报错）
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # 1. 配置 Node.js 环境（用于 webpack 前端打包）
+      # 2. 配置 Node.js 环境
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 2. 安装 uv 包管理器
+      # 3. 安装 uv 包管理器
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      # 3. 使用 uv 和 webpack 完整编译静态网站
+      # 4. 自动安装 Python 和 Webpack 的所有依赖
+      - name: Install dependencies
+        run: |
+          uv sync
+          if [ -d "webpack" ]; then npm --prefix webpack install; fi
+          if [ -f "package.json" ]; then npm install; fi
+
+      # 5. 编译静态网站
       - name: Build site with Lektor & Webpack
         run: |
           uv run lektor build -f webpack --output-path ./dist
 
-      # 4. 同步到 Ubuntu 服务器
+      # 6. 同步到 Ubuntu 服务器
       - name: Deploy to Ubuntu Server
         uses: easingthemes/ssh-deploy@main
         with:
