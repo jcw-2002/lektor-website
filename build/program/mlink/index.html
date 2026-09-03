@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../static/styles.css?h=49e864fa">
+  <link rel="stylesheet" href="../../static/pygments.css">
+  <link rel="shortcut icon" href="../../static/favicon.png?h=fa09bedd">
+  <title>Hexo AnZhiYu主题友链页面自定义数据源功能实现 | 欢迎来到我的博客</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../">W JC</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li class="active"><a href="../">18🈲</a></li>
+          
+            <li><a href="../../web/">Web</a></li>
+          
+            <li><a href="../../links/">友链</a></li>
+          
+            <li><a href="../../quotes/">语录</a></li>
+          
+            <li><a href="../../about/">关于我</a></li>
+          
+            <li><a href="../../update/">更新</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+    <div class="container">
+      
+  <div class="row">
+    <div class="col-sm-3">
+      
+  
+    
+  
+
+  
+  
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+
+  
+  
+  
+    
+      
+      
+    
+  
+    
+      
+      
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+
+  <ul class="tree-nav nocontent">
+    <li><a href="../">编程</a></li>
+
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+      <li class="tree-group">
+        <details>
+          <summary class="tree-group-title">Python</summary>
+          <ul class="tree-group-items">
+            
+              
+                <li><a href="../conda/">Conda 环境管理</a></li>
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+      
+      
+        
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+      <li class="tree-group">
+        <details open>
+          <summary class="tree-group-title">博客</summary>
+          <ul class="tree-group-items">
+            
+              
+            
+              
+                <li class="active"><a href="./">Hexo AnZhiYu主题友链页面自定义数据源功能实现</a></li>
+              
+            
+              
+                <li><a href="../hexo-cloud/">Hexo 博客部署到云服务器完整教程</a></li>
+              
+            
+              
+                <li><a href="../hexo-vercel-deploy/">Hexo 博客零成本部署到 Vercel 完整指南</a></li>
+              
+            
+              
+                <li><a href="../swiper-fix/">解决安知鱼主题轮播图无法正常播放问题</a></li>
+              
+            
+              
+                <li><a href="../hexo-bottom-quote-widget/">页面底部添加语句</a></li>
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+
+    
+    
+      <li><a href="../git-update/">Git 更新仓库</a></li>
+    
+      <li><a href="../lektor/">lektor 操作</a></li>
+    
+  </ul>
+
+    </div>
+    <div class="col-sm-9 doc-styling">
+      <h1>Hexo AnZhiYu主题友链页面自定义数据源功能实现</h1>
+      
+      <h2 id="qian-yan">前言</h2><p>在使用Hexo AnZhiYu主题时，我们经常需要创建各种列表页面，比如友情链接、在线工具推荐、番剧记录等。原本的设计中，如果页面使用 <code>type: link</code>，就会强制读取 <code>_data/link.yml</code> 文件，这限制了我们创建多样化页面的灵活性。</p>
+<p>今天分享一个功能改进：<strong>通过添加 <code>page</code> 参数实现自定义数据源</strong>，让友链模板可以复用于不同类型的页面。</p>
+<h2 id="wen-ti-fen-xi">问题分析</h2><h3 id="yuan-you-ji-zhi-de-ju-xian-xing">原有机制的局限性</h3><div class="hll"><pre><span></span><span class="c1"># 原有方式：所有 type: link 的页面都会读取 link.yml</span>
+<span class="nn">---</span>
+<span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">友情链接</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">link</span>
+<span class="nn">---</span>
+</pre></div>
+<p>这种设计存在以下问题：</p>
+<ul>
+<li>所有使用link模板的页面都会显示相同的友链数据</li>
+<li>无法创建独立的工具推荐、番剧记录等页面</li>
+<li>数据源固定，缺乏灵活性</li>
+</ul>
+<h3 id="gai-jin-hou-de-ji-zhi">改进后的机制</h3><div class="hll"><pre><span></span><span class="c1"># 新方式：通过 page 参数指定数据源</span>
+<span class="nn">---</span>
+<span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">在线工具推荐</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">link</span>
+<span class="nt">page</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">online</span><span class="w">  </span><span class="c1"># 读取 _data/online.yml</span>
+<span class="nn">---</span>
+</pre></div>
+<h2 id="ji-zhu-shi-xian">技术实现</h2><h3 id="he-xin-luo-ji-fen-xi">核心逻辑分析</h3><p>在 <code>flink.pug</code> 模板中，关键的判断逻辑如下：</p>
+<div class="hll"><pre><span></span><span class="o">-</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">isCustomPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s1">'link'</span>
+<span class="o">-</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">dataSource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">site</span><span class="p">.</span><span class="nx">data</span><span class="p">[</span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="p">]</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nx">site</span><span class="p">.</span><span class="nx">data</span><span class="p">.</span><span class="nx">link</span>
+<span class="o">-</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">pageTitle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">'bangumis'</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s1">'番剧'</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s1">'友情链接'</span>
+</pre></div>
+<p><strong>逻辑解释：</strong></p>
+<ol>
+<li><code>isCustomPage</code>：判断是否为自定义页面（有page参数且不等于'link'）</li>
+<li><code>dataSource</code>：根据是否为自定义页面选择对应的数据源</li>
+<li><code>pageTitle</code>：动态设置页面标题，支持中文名称映射</li>
+</ol>
+<h3 id="sui-ji-fang-wen-gong-neng-gua-pei">随机访问功能适配</h3><div class="hll"><pre><span></span><span class="c1">// 自定义页面随机访问按钮</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">isCustomPage</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">dataSource</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">dataSource</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0</span>
+<span class="w">  </span><span class="nx">a</span><span class="p">.</span><span class="nx">banner</span><span class="o">-</span><span class="nx">button</span><span class="p">.</span><span class="nx">secondary</span><span class="p">.</span><span class="nx">no</span><span class="o">-</span><span class="nx">text</span><span class="o">-</span><span class="nx">decoration</span><span class="p">(</span><span class="nx">onclick</span><span class="o">=</span><span class="sb">`customPageRandomVisit('</span><span class="si">${</span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="si">}</span><span class="sb">')`</span><span class="p">)</span>
+<span class="w">    </span><span class="nx">i</span><span class="p">.</span><span class="nx">anzhiyufont</span><span class="p">.</span><span class="nx">anzhiyu</span><span class="o">-</span><span class="nx">icon</span><span class="o">-</span><span class="nx">paper</span><span class="o">-</span><span class="nx">plane1</span>
+<span class="w">    </span><span class="nx">span</span><span class="p">.</span><span class="nx">banner</span><span class="o">-</span><span class="nx">button</span><span class="o">-</span><span class="nx">text</span><span class="w"> </span><span class="nx">随机访问</span>
+</pre></div>
+<p>随机访问功能也相应适配，确保不同页面的随机访问功能互不干扰。</p>
+<h2 id="shi-yong-fang-fa">使用方法</h2><h3 id="1-chuang-jian-shu-ju-wen-jian">1. 创建数据文件</h3><p>在 <code>source/_data/</code> 目录下创建对应的 <code>.yml</code> 文件：</p>
+<div class="hll"><pre><span></span><span class="c1"># source/_data/online.yml</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">class_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">开发工具</span>
+<span class="w">  </span><span class="nt">class_desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">提升开发效率的在线工具</span>
+<span class="w">  </span><span class="nt">flink_style</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anzhiyu</span>
+<span class="w">  </span><span class="nt">link_list</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GitHub</span>
+<span class="w">      </span><span class="nt">link</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com</span>
+<span class="w">      </span><span class="nt">avatar</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github_compressed.jpg</span>
+<span class="w">      </span><span class="nt">descr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">全球最大的代码托管平台</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">VSCode Online</span>
+<span class="w">      </span><span class="nt">link</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://vscode.dev</span>
+<span class="w">      </span><span class="nt">avatar</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vscode_compressed.jpg</span>
+<span class="w">      </span><span class="nt">descr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">在线版VS Code编辑器</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">class_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">设计工具</span><span class="w">  </span>
+<span class="w">  </span><span class="nt">class_desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">设计师必备的在线工具</span>
+<span class="w">  </span><span class="nt">flink_style</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telescopic</span>
+<span class="w">  </span><span class="nt">link_list</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Figma</span>
+<span class="w">      </span><span class="nt">link</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://figma.com</span>
+<span class="w">      </span><span class="nt">avatar</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">figma_compressed.jpg</span>
+<span class="w">      </span><span class="nt">descr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">专业的UI/UX设计工具</span>
+</pre></div>
+<h3 id="2-chuang-jian-ye-mian-wen-jian">2. 创建页面文件</h3><div class="hll"><pre><span></span><span class="gu">&lt;!-- source/online/index.md --&gt;</span>
+<span class="gu">---</span>
+title: 在线工具推荐
+type: link
+page: online
+<span class="gu">date: 2025-01-27 10:00:00</span>
+<span class="gu">---</span>
+
+这里收集了各种实用的在线工具，帮助提升工作效率。
+</pre></div>
+<h3 id="3-zhi-chi-de-ye-mian-lei-xing">3. 支持的页面类型</h3><ul>
+<li><strong>友情链接</strong> (<code>type: link</code>)：默认读取 <code>link.yml</code></li>
+<li><strong>在线工具</strong> (<code>page: online</code>)：读取 <code>online.yml</code></li>
+<li><strong>番剧记录</strong> (<code>page: bangumis</code>)：读取 <code>bangumis.yml</code>，显示为&quot;番剧&quot;</li>
+<li><strong>其他自定义</strong> (<code>page: custom</code>)：读取 <code>custom.yml</code></li>
+</ul>
+<h2 id="gong-neng-te-xing">功能特性</h2><h3 id="1-yang-shi-fu-yong">1. 样式复用</h3><p>支持所有原有的友链样式：</p>
+<ul>
+<li><code>anzhiyu</code>：默认卡片样式</li>
+<li><code>telescopic</code>：望远镜样式</li>
+<li><code>flexcard</code>：弹性卡片样式</li>
+</ul>
+<h3 id="2-biao-ti-zhi-neng-ying-she">2. 标题智能映射</h3><div class="hll"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">pageTitle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span>
+<span class="w">  </span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">'bangumis'</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s1">'番剧'</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span>
+<span class="w">  </span><span class="s1">'友情链接'</span>
+</pre></div>
+<p>特殊页面可以映射为中文名称，提升用户体验。</p>
+<h3 id="3-sui-ji-fang-wen-gong-neng">3. 随机访问功能</h3><p>每个自定义页面都有独立的随机访问功能，互不干扰。</p>
+<h3 id="4-tou-xiang-lu-jing-chu-li">4. 头像路径处理</h3><div class="hll"><pre><span></span><span class="o">-</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nx">currentPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">page</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s1">'link'</span>
+<span class="o">-</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nx">avatarPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sb">`</span><span class="si">${</span><span class="nx">currentPage</span><span class="si">}</span><span class="sb">/</span><span class="si">${</span><span class="nx">item</span><span class="p">.</span><span class="nx">avatar</span><span class="si">}</span><span class="sb">`</span>
+</pre></div>
+<p>头像文件可以按页面类型分目录存放，便于管理。</p>
+<h2 id="you-shi-zong-jie">优势总结</h2><ol>
+<li><strong>灵活性</strong>：一个模板支持多种页面类型</li>
+<li><strong>复用性</strong>：减少重复代码，提高维护效率</li>
+<li><strong>扩展性</strong>：可以轻松添加新的页面类型</li>
+<li><strong>兼容性</strong>：完全向后兼容原有的友链功能</li>
+<li><strong>用户体验</strong>：支持中文标题、独立随机访问等功能</li>
+</ol>
+<h2 id="shi-ji-ying-yong-chang-jing">实际应用场景</h2><ul>
+<li><strong>工具导航站</strong>：收集各种在线工具</li>
+<li><strong>资源分享页</strong>：分享学习资源、软件推荐</li>
+<li><strong>项目展示</strong>：展示个人项目或作品集</li>
+<li><strong>番剧追踪</strong>：记录追番进度和评价</li>
+<li><strong>书单推荐</strong>：分享读书心得和推荐</li>
+</ul>
+<h2 id="zong-jie">总结</h2><p>通过这个功能改进，我们实现了友链模板的通用化，让一个模板可以服务于多种不同的页面需求。这不仅提高了代码的复用性，也为博客的内容组织提供了更大的灵活性。</p>
+<p>如果你也在使用AnZhiYu主题，不妨试试这个功能，相信会为你的博客增色不少！</p>
+<hr />
+<p><em>本文介绍的功能基于AnZhiYu主题的flink.pug模板实现，具体代码可能因版本而异，请以实际情况为准。</em></p>
+<h2 id="wan-zheng-dai-ma-shi-xian">完整代码实现</h2><p>以下是 <code>flink.pug</code> 模板的完整代码，包含了所有自定义数据源功能的实现：</p>
+<div class="hll"><pre><span></span><span class="nf">#article-container</span>
+<span class="w">  </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="ss">'lin</span><span class="n">k</span><span class="err">'</span>
+<span class="w">  </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">dataSource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">site</span><span class="p">.</span><span class="n">data</span><span class="p">[</span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="p">]</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">site</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">link</span>
+<span class="w">  </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">pageTitle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">(</span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="ss">'bangumi</span><span class="n">s</span><span class="err">'</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="ss">'番</span><span class="n">剧</span><span class="err">'</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="ss">'友情链</span><span class="n">接</span><span class="err">'</span>
+<span class="w">  </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">showLinkPageTop</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">page</span><span class="p">.</span><span class="n">linkpagetop</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">page</span><span class="p">.</span><span class="n">linkpagetop</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="n">undefined</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">theme</span><span class="p">.</span><span class="n">linkPageTop</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">theme</span><span class="p">.</span><span class="n">linkPageTop</span><span class="p">.</span><span class="n">enable</span><span class="p">)</span>
+<span class="w">  </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">customTitle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">linkpagetop_title</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">theme</span><span class="p">.</span><span class="n">linkPageTop</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">theme</span><span class="p">.</span><span class="n">linkPageTop</span><span class="p">.</span><span class="n">title</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">`${pageTitle}记录`</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s">"与数百名博主无限进步"</span><span class="p">))</span>
+
+<span class="w">  </span><span class="nt">if</span> showLinkPageTop
+<span class="w">    </span><span class="nf">#flink-banners</span>
+<span class="w">      </span><span class="nc">.banner-top-box</span>
+<span class="w">        </span><span class="nc">.flink-banners-title</span>
+<span class="w">          </span><span class="nc">.banners-title-small</span><span class="p">=</span><span class="n">pageTitle</span>
+<span class="w">          </span><span class="nc">.banners-title-big</span><span class="p">=</span><span class="n">customTitle</span>
+<span class="w">        </span><span class="nc">.banner-button-group</span>
+<span class="w">          </span><span class="nt">if</span> (theme.friends_vue.apiurl &amp;&amp; !isCustomPage)
+<span class="w">            </span><span class="nt">a</span><span class="nc">.banner-button.secondary.no-text-decoration</span>(<span class="na">onclick=</span><span class="s">"friendChainRandomTransmission()"</span>)
+<span class="w">              </span><span class="nt">i</span><span class="nc">.anzhiyufont.anzhiyu-icon-paper-plane1</span>
+<span class="w">              </span><span class="nt">span</span><span class="nc">.banner-button-text</span> 随机访问
+<span class="w">          </span><span class="nt">if</span> isCustomPage &amp;&amp; dataSource &amp;&amp; dataSource.length &gt; 0
+<span class="w">            </span><span class="nt">a</span><span class="nc">.banner-button.secondary.no-text-decoration</span>(<span class="na">onclick=</span><span class="err">`</span><span class="nv">customPageRandomVisit</span><span class="err">('${</span><span class="na">page</span><span class="err">.</span><span class="na">page</span><span class="err">}'</span>)`)
+<span class="w">              </span><span class="nt">i</span><span class="nc">.anzhiyufont.anzhiyu-icon-paper-plane1</span>
+<span class="w">              </span><span class="nt">span</span><span class="nc">.banner-button-text</span> 随机访问
+<span class="w">          </span><span class="nt">if</span> theme.linkPageTop.addFriendPlaceholder &amp;&amp; theme.comments.use == 'Twikoo' &amp;&amp; theme.twikoo.envId &amp;&amp; !isCustomPage
+<span class="w">            </span><span class="nt">a</span><span class="nc">.banner-button.no-text-decoration</span>(<span class="na">onclick=</span><span class="s">"anzhiyu.addFriendLink()"</span>)
+<span class="w">              </span><span class="nt">i</span><span class="nc">.anzhiyufont.anzhiyu-icon-arrow-circle-right</span>
+<span class="w">              </span><span class="nt">span</span><span class="nc">.banner-button-text</span> 申请友链
+<span class="w">      </span><span class="nt">if</span> showLinkPageTop &amp;&amp; ((page.linkpagetop === true) || (!isCustomPage))
+<span class="w">        </span><span class="nf">#skills-tags-group-all</span>
+<span class="w">          </span><span class="nc">.tags-group-wrapper</span>
+<span class="w">            </span><span class="p">-</span><span class="w"> </span><span class="n">function</span><span class="w"> </span><span class="n">getAvatarWithoutExclamationMark</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="p">-</span><span class="w">   </span><span class="n">const</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">url</span><span class="p">.</span><span class="n">indexOf</span><span class="p">(</span><span class="sc">'!'</span><span class="p">);</span>
+<span class="w">            </span><span class="p">-</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">url</span><span class="p">.</span><span class="n">substring</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">index</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">url</span><span class="p">;</span>
+<span class="w">            </span><span class="p">-</span><span class="w"> </span><span class="p">}</span>
+<span class="w">            </span><span class="nt">each</span> y in [1,2]
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">linkData</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">site</span><span class="p">.</span><span class="n">data</span><span class="p">[</span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="p">]</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">site</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">link</span>
+<span class="w">              </span><span class="nt">each</span> i, index in (linkData || []).slice(0, 15)
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">link_list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">link_list</span><span class="p">.</span><span class="n">slice</span><span class="p">()</span>
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">evenNum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">link_list</span><span class="p">.</span><span class="n">filter</span><span class="p">((</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">index</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">oddNum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">link_list</span><span class="p">.</span><span class="n">filter</span><span class="p">((</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">index</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">                </span><span class="nt">each</span> item, index2 in link_list.slice(0, Math.min(evenNum.length, oddNum.length))
+<span class="w">                  </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">index2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span>
+<span class="w">                  </span><span class="nt">if</span> (index &lt;= 15 &amp;&amp; typeof evenNum[index] !== 'undefined' &amp;&amp; typeof oddNum[index] !== 'undefined')
+<span class="w">                    </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">oddNumAvatar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">getAvatarWithoutExclamationMark</span><span class="p">(</span><span class="n">oddNum</span><span class="p">[</span><span class="n">index</span><span class="p">].</span><span class="n">avatar</span><span class="p">);</span>
+<span class="w">                    </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">evenNumAvatar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">getAvatarWithoutExclamationMark</span><span class="p">(</span><span class="n">evenNum</span><span class="p">[</span><span class="n">index</span><span class="p">].</span><span class="n">avatar</span><span class="p">);</span>
+<span class="w">                    </span><span class="p">-</span><span class="w"> </span><span class="n">const</span><span class="w"> </span><span class="n">currentPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="ss">'lin</span><span class="n">k</span><span class="err">'</span>
+<span class="w">                    </span><span class="p">-</span><span class="w"> </span><span class="n">oddNumAvatar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">oddNumAvatar</span><span class="p">.</span><span class="n">startsWith</span><span class="p">(</span><span class="ss">'link</span><span class="o">/</span><span class="err">'</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">oddNumAvatar</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">`${currentPage}/${oddNumAvatar}`</span>
+<span class="w">                    </span><span class="p">-</span><span class="w"> </span><span class="n">evenNumAvatar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">evenNumAvatar</span><span class="p">.</span><span class="n">startsWith</span><span class="p">(</span><span class="ss">'link</span><span class="o">/</span><span class="err">'</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">evenNumAvatar</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">`${currentPage}/${evenNumAvatar}`</span>
+<span class="w">                    </span><span class="nc">.tags-group-icon-pair</span>
+<span class="w">                      </span><span class="nt">a</span><span class="nc">.tags-group-icon.no-text-decoration</span>(<span class="na">href=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">evenNum</span><span class="err">[</span><span class="na">index</span><span class="err">].</span><span class="na">link</span>), title=evenNum[index].name)
+<span class="w">                        </span><span class="nt">img</span><span class="nc">.no-lightbox</span>(<span class="na">title=</span><span class="nv">evenNum</span><span class="err">[</span><span class="na">index</span><span class="err">].</span><span class="na">name</span><span class="err">,</span> <span class="na">src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">evenNumAvatar</span> <span class="err">+</span> <span class="na">hundredSuffix</span>) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=evenNum[index].name)
+<span class="w">                      </span><span class="nt">a</span><span class="nc">.tags-group-icon.no-text-decoration</span>(<span class="na">href=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">oddNum</span><span class="err">[</span><span class="na">index</span><span class="err">].</span><span class="na">link</span>), title=oddNum[index].name)
+<span class="w">                        </span><span class="nt">img</span><span class="nc">.no-lightbox</span>(<span class="na">title=</span><span class="nv">oddNum</span><span class="err">[</span><span class="na">index</span><span class="err">].</span><span class="na">name</span><span class="err">,</span> <span class="na">src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">oddNumAvatar</span> <span class="err">+</span> <span class="na">hundredSuffix</span>) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=oddNum[index].name)
+<span class="w">  </span><span class="nt">if</span> theme.friends_vue &amp;&amp; theme.friends_vue.enable &amp;&amp; !isCustomPage
+<span class="w">    </span><span class="nc">.title-h2-a</span>
+<span class="w">      </span><span class="nc">.title-h2-a-left</span>
+<span class="w">        </span><span class="nt">h2</span>(<span class="na">style=</span><span class="s">'padding-top:0;margin:.6rem 0 .6rem'</span>) 🎣 钓鱼
+<span class="w">        </span><span class="nt">a</span><span class="nc">.random-post-start.no-text-decoration</span>(<span class="na">href=</span><span class="s">'javascript:fetchRandomPost();'</span>)
+<span class="w">          </span><span class="nt">i</span><span class="nc">.anzhiyufont.anzhiyu-icon-arrow-rotate-right</span>
+<span class="w">      </span><span class="nc">.title-h2-a-right</span>
+<span class="w">        </span><span class="nt">a</span><span class="nc">.random-post-all.no-text-decoration</span>(<span class="na">href=</span><span class="s">'/link/'</span>) 全部友链
+<span class="w">    </span><span class="nf">#random-post</span>
+<span class="w">    </span><span class="nt">script</span>(<span class="na">defer</span> <span class="na">data-pjax</span> <span class="na">src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">theme</span><span class="err">.</span><span class="na">asset</span><span class="err">.</span><span class="na">random_friends_post_js</span>))
+
+<span class="w">  </span><span class="nc">.flink</span>
+<span class="w">    </span><span class="nt">if</span> dataSource
+<span class="w">      </span><span class="nt">each</span> i in dataSource
+<span class="w">        </span><span class="nt">if</span> i.class_name
+<span class="w">          </span><span class="nt">h2</span><span class="p">!=</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">class_name</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">"("</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">link_list</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">")"</span>
+<span class="w">        </span><span class="nt">if</span> i.class_desc
+<span class="w">          </span><span class="nc">.flink-desc</span><span class="p">!=</span><span class="n">i</span><span class="p">.</span><span class="n">class_desc</span>
+<span class="w">        </span><span class="nt">if</span> i.flink_style === 'anzhiyu'
+<span class="w">          </span><span class="nt">div</span>(<span class="na">class=</span><span class="nv">i</span><span class="err">.</span><span class="na">lost_contact</span> <span class="err">?</span> <span class="err">'</span><span class="na">anzhiyu-flink-list</span> <span class="na">cf-friends-lost-contact</span><span class="err">'</span> <span class="na">:</span> <span class="err">'</span><span class="na">anzhiyu-flink-list</span><span class="err">'</span>)
+<span class="w">            </span><span class="nt">if</span> i.link_list
+<span class="w">              </span><span class="nt">each</span> item in i.link_list
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">color</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s">""</span>
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">tag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">tag</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s">""</span>
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">currentPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="ss">'lin</span><span class="n">k</span><span class="err">'</span>
+<span class="w">                </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">avatarPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">`${currentPage}/${item.avatar}`</span>
+
+<span class="w">                </span><span class="nc">.flink-list-item</span>
+<span class="w">                  </span><span class="nt">if</span> color == "vip" &amp;&amp; tag
+<span class="w">                    </span><span class="nt">span</span><span class="nc">.site-card-tag.vip</span> #[=tag]
+<span class="w">                      </span><span class="nt">i</span><span class="nc">.light</span>
+<span class="w">                  </span><span class="nt">else</span> if color == "speed" &amp;&amp; tag
+<span class="w">                    </span><span class="nt">span</span><span class="nc">.site-card-tag.speed</span> #[=tag]
+<span class="w">                  </span><span class="nt">else</span> if tag
+<span class="w">                    </span><span class="nt">span</span><span class="nc">.site-card-tag</span>(<span class="na">style=</span><span class="err">`</span><span class="nv">background</span><span class="na">-color:</span> <span class="err">${</span><span class="na">color</span><span class="err">}`</span>) #[=tag]
+<span class="w">                  </span><span class="nt">else</span> if item.recommend
+<span class="w">                    </span><span class="nt">span</span><span class="nc">.site-card-tag</span> 荐
+<span class="w">                  </span><span class="nt">if</span> i.lost_contact
+<span class="w">                    </span><span class="nt">a</span><span class="nc">.cf-friends-link</span>(<span class="na">href=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">item</span><span class="err">.</span><span class="na">link</span>) title=item.name target="_blank")
+<span class="w">                      </span><span class="nt">if</span> theme.lazyload.enable
+<span class="w">                        </span><span class="nt">img</span><span class="nc">.no-lightbox</span>(<span class="na">data-lazy-src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">avatarPath</span> <span class="err">+</span> <span class="na">hundredSuffix</span>) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+<span class="w">                      </span><span class="nt">else</span>
+<span class="w">                        </span><span class="nt">img</span><span class="nc">.cf-friends-avatar.no-lightbox</span>(<span class="na">src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">avatarPath</span> <span class="err">+</span> <span class="na">hundredSuffix</span>) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+<span class="w">                      </span><span class="nc">.flink-item-info</span>
+<span class="w">                        </span><span class="nc">.flink-item-name.cf-friends-name-lost-contact</span><span class="p">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">name</span>
+<span class="w">                  </span><span class="nt">else</span>
+<span class="w">                    </span><span class="nt">a</span><span class="nc">.cf-friends-link</span>(<span class="na">href=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">item</span><span class="err">.</span><span class="na">link</span>) cf-href=url_for(item.link) title=item.name target="_blank")
+<span class="w">                      </span><span class="nt">if</span> theme.lazyload.enable
+<span class="w">                        </span><span class="nt">img</span><span class="nc">.cf-friends-avatar.no-lightbox</span>(<span class="na">data-lazy-src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">avatarPath</span> <span class="err">+</span> <span class="na">hundredSuffix</span>), cf-src=url_for(avatarPath + hundredSuffix), onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+<span class="w">                      </span><span class="nt">else</span>
+<span class="w">                        </span><span class="nt">img</span><span class="nc">.cf-friends-avatar.no-lightbox</span>(<span class="na">src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">avatarPath</span> <span class="err">+</span> <span class="na">hundredSuffix</span>) cf-src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt=item.name )
+<span class="w">                      </span><span class="nc">.flink-item-info</span>
+<span class="w">                        </span><span class="nc">.flink-item-name.cf-friends-name</span><span class="p">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">name</span>
+<span class="w">                        </span><span class="nc">.flink-item-desc</span>(<span class="na">title=</span><span class="nv">item</span><span class="err">.</span><span class="na">descr</span>)<span class="p">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">descr</span>
+
+<span class="w">        </span><span class="nt">else</span> if i.flink_style === 'telescopic'
+<span class="w">          </span><span class="nc">.telescopic-site-card-group</span>
+<span class="w">            </span><span class="nt">each</span> item in i.link_list
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">color</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s">""</span>
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">tag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">tag</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s">""</span>
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">siteshot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">siteshot</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">`https://image.thum.io/get/width/400/crop/800/allowJPG/wait/20/noanimate/${item.link}`</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">theme</span><span class="p">.</span><span class="n">default_img</span>
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">currentPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="ss">'lin</span><span class="n">k</span><span class="err">'</span>
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">avatarPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">`${currentPage}/${item.avatar}`</span>
+<span class="w">              </span><span class="nc">.site-card</span>
+<span class="w">                </span><span class="nt">if</span> color == "vip" &amp;&amp; tag
+<span class="w">                  </span><span class="nt">span</span><span class="nc">.site-card-tag.vip</span> #[=tag]
+<span class="w">                    </span><span class="nt">i</span><span class="nc">.light</span>
+<span class="w">                </span><span class="nt">else</span> if color == "speed" &amp;&amp; tag
+<span class="w">                  </span><span class="nt">span</span><span class="nc">.site-card-tag.speed</span> #[=tag]
+<span class="w">                </span><span class="nt">else</span> if tag
+<span class="w">                  </span><span class="nt">span</span><span class="nc">.site-card-tag</span>(<span class="na">style=</span><span class="err">`</span><span class="nv">background</span><span class="na">-color:</span> <span class="err">${</span><span class="na">color</span><span class="err">}`</span>) #[=tag]
+<span class="w">                </span><span class="nt">else</span> if item.recommend
+<span class="w">                  </span><span class="nt">span</span><span class="nc">.site-card-tag</span> 荐
+<span class="w">                </span><span class="nt">a</span><span class="nc">.img.no-text-decoration</span>(<span class="na">target=</span><span class="s">'_blank'</span><span class="err">,</span> <span class="na">title=</span><span class="err">`${</span><span class="nv">item</span><span class="err">.</span><span class="na">name</span><span class="err">}`,</span> <span class="na">href=</span><span class="err">`${</span><span class="nv">item</span><span class="err">.</span><span class="na">link</span><span class="err">}`,</span> <span class="na">rel=</span><span class="s">'external nofollow'</span>)
+<span class="w">                  </span><span class="nt">img</span><span class="nc">.flink-avatar</span>(<span class="na">data-lazy-src=</span><span class="nv">siteshot</span><span class="err">,</span> <span class="na">onerror=</span><span class="err">`</span><span class="nv">this</span><span class="err">.</span><span class="na">onerror=</span><span class="nv">null</span><span class="err">;</span><span class="na">this</span><span class="err">.</span><span class="na">src=</span><span class="s">'${theme.default_img}'</span><span class="err">`,</span> <span class="na">alt=</span><span class="nv">item</span><span class="err">.</span><span class="na">name</span><span class="err">,</span> <span class="na">style=</span><span class="s">"pointer-events: none;"</span><span class="err">,</span> <span class="na">src=</span><span class="err">`${</span><span class="nv">siteshot</span><span class="err">}`</span>)
+<span class="w">                </span><span class="nt">a</span><span class="nc">.info.cf-friends-link.no-text-decoration</span>(<span class="na">target=</span><span class="s">'_blank'</span><span class="err">,</span> <span class="na">title=</span><span class="err">`${</span><span class="nv">item</span><span class="err">.</span><span class="na">name</span><span class="err">}`,</span> <span class="na">href=</span><span class="err">`${</span><span class="nv">item</span><span class="err">.</span><span class="na">link</span><span class="err">}`,</span> <span class="na">cf-href=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">item</span><span class="err">.</span><span class="na">link</span>), rel='external nofollow')
+<span class="w">                  </span><span class="nc">.site-card-avatar</span>
+<span class="w">                    </span><span class="nt">img</span><span class="nc">.flink-avatar.cf-friends-avatar.no-fancybox</span>(<span class="na">data-lazy-src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">avatarPath</span> <span class="err">+</span> <span class="na">hundredSuffix</span>), cf-src=url_for(avatarPath + hundredSuffix), onerror=`this.onerror=null;this.src='${theme.default_img}'`, alt=item.name, src=url_for(avatarPath + hundredSuffix))
+<span class="w">                  </span><span class="nc">.site-card-text</span>
+<span class="w">                    </span><span class="nt">span</span><span class="nc">.title.cf-friends-name</span> #[=item.name]
+<span class="w">                    </span><span class="nt">span</span><span class="nc">.desc</span>(<span class="na">title=</span><span class="err">`${</span><span class="nv">item</span><span class="err">.</span><span class="na">descr</span><span class="err">}`</span>) #[=item.descr]
+<span class="w">        </span><span class="nt">else</span> if i.flink_style === 'flexcard'
+<span class="w">          </span><span class="nc">.flexcard-flink-list</span>
+<span class="w">            </span><span class="nt">each</span> item in i.link_list
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">hundredSuffix</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">currentPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">isCustomPage</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">page</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="ss">'lin</span><span class="n">k</span><span class="err">'</span>
+<span class="w">              </span><span class="p">-</span><span class="w"> </span><span class="n">let</span><span class="w"> </span><span class="n">avatarPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">`${currentPage}/${item.avatar}`</span>
+<span class="w">              </span><span class="nt">a</span><span class="nc">.flink-list-card.cf-friends-link</span>(<span class="na">href=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">item</span><span class="err">.</span><span class="na">link</span>) cf-href=url_for(item.link) target='_blank' data-title=item.descr)
+<span class="w">                </span><span class="nc">.wrapper.cover</span>
+<span class="w">                  </span><span class="p">-</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">siteshot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">siteshot</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">url_for</span><span class="p">(</span><span class="n">item</span><span class="p">.</span><span class="n">siteshot</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="ss">'https</span><span class="p">:</span><span class="c1">//image.thum.io/get/width/400/crop/800/allowJPG/wait/20/noanimate/' + item.link</span>
+<span class="w">                  </span><span class="nt">if</span> theme.lazyload.enable
+<span class="w">                    </span><span class="nt">img</span><span class="nc">.cover.fadeIn</span>(<span class="na">data-lazy-src=</span><span class="nv">siteshot</span> <span class="na">onerror=</span><span class="err">`</span><span class="nv">this</span><span class="err">.</span><span class="na">onerror=</span><span class="nv">null</span><span class="err">;</span><span class="na">this</span><span class="err">.</span><span class="na">src=</span><span class="s">'` + url_for(theme.error_img.post_page) + `'</span><span class="err">`</span> <span class="na">alt=</span><span class="s">'cover'</span> )
+<span class="w">                  </span><span class="nt">else</span>
+<span class="w">                    </span><span class="nt">img</span><span class="nc">.cover.fadeIn</span>(<span class="na">src=</span><span class="nv">siteshot</span> <span class="na">onerror=</span><span class="err">`</span><span class="nv">this</span><span class="err">.</span><span class="na">onerror=</span><span class="nv">null</span><span class="err">;</span><span class="na">this</span><span class="err">.</span><span class="na">src=</span><span class="s">'` + url_for(theme.error_img.post_page) + `'</span><span class="err">`</span> <span class="na">alt=</span><span class="s">'cover'</span> )    
+<span class="w">                </span><span class="nc">.info</span>
+<span class="w">                  </span><span class="nt">if</span> theme.lazyload.enable
+<span class="w">                    </span><span class="nt">img</span><span class="nc">.cf-friends-avatar.no-lightbox.flink-avatar</span>(<span class="na">data-lazy-src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">avatarPath</span> <span class="err">+</span> <span class="na">hundredSuffix</span>) cf-src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt='cover' )
+<span class="w">                  </span><span class="nt">else</span>
+<span class="w">                    </span><span class="nt">img</span><span class="nc">.cf-friends-avatar.no-lightbox</span>(<span class="na">src=</span><span class="nv">url_for</span><span class="err">(</span><span class="na">avatarPath</span> <span class="err">+</span> <span class="na">hundredSuffix</span>) cf-src=url_for(avatarPath + hundredSuffix) onerror=`this.onerror=null;this.src='` + url_for(theme.error_img.flink) + `'` alt='cover' )
+<span class="w">                  </span><span class="nt">span</span><span class="nc">.flink-sitename.cf-friends-name</span><span class="p">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">name</span>
+<span class="w">    </span><span class="err">!= </span><span class="nt">page</span><span class="nc">.content</span>
+<span class="w">    </span><span class="nt">script</span>.
+<span class="w">      </span><span class="c">// 自定义页面随机访问功能</span>
+<span class="w">      </span><span class="nt">function</span> customPageRandomVisit(pageName) {
+<span class="w">        </span><span class="nt">try</span> {
+<span class="w">          </span><span class="nt">const</span> dataSource = !{JSON.stringify(dataSource)};
+<span class="w">          </span><span class="nt">if</span> (!dataSource || dataSource.length === 0) {
+<span class="w">            </span><span class="nt">anzhiyu</span><span class="nc">.snackbarShow</span>(<span class="err">'</span><span class="na">没有找到可访问的链接</span><span class="err">'</span>);
+<span class="w">            </span><span class="nt">return</span>;
+<span class="w">          </span><span class="err">}</span>
+
+<span class="w">          </span><span class="c">// 收集所有链接</span>
+<span class="w">          </span><span class="nt">let</span> allLinks = [];
+<span class="w">          </span><span class="nt">dataSource</span><span class="nc">.forEach</span>(<span class="na">category =</span><span class="err">&gt;</span> <span class="err">{</span>
+<span class="w">            </span><span class="nt">if</span> (category.link_list &amp;&amp; Array.isArray(category.link_list)) {
+<span class="w">              </span><span class="nt">category</span><span class="nc">.link_list.forEach</span>(<span class="na">item =</span><span class="err">&gt;</span> <span class="err">{</span>
+<span class="w">                </span><span class="nt">if</span> (item.link) {
+<span class="w">                  </span><span class="nt">allLinks</span><span class="nc">.push</span>(<span class="err">{</span>
+                    <span class="na">name:</span> <span class="na">item</span><span class="err">.</span><span class="na">name</span><span class="err">,</span>
+                    <span class="na">link:</span> <span class="na">item</span><span class="err">.</span><span class="na">link</span>
+                  <span class="err">}</span>);
+<span class="w">                </span><span class="err">}</span>
+<span class="w">              </span><span class="err">});</span>
+<span class="w">            </span><span class="err">}</span>
+<span class="w">          </span><span class="err">});</span>
+
+<span class="w">          </span><span class="nt">if</span> (allLinks.length === 0) {
+<span class="w">            </span><span class="nt">anzhiyu</span><span class="nc">.snackbarShow</span>(<span class="err">'</span><span class="na">没有找到可访问的链接</span><span class="err">'</span>);
+<span class="w">            </span><span class="nt">return</span>;
+<span class="w">          </span><span class="err">}</span>
+
+<span class="w">          </span><span class="c">// 随机选择一个链接</span>
+<span class="w">          </span><span class="nt">const</span> randomIndex = Math.floor(Math.random() * allLinks.length);
+<span class="w">          </span><span class="nt">const</span> selectedLink = allLinks[randomIndex];
+
+<span class="w">          </span><span class="nt">anzhiyu</span><span class="nc">.snackbarShow</span>(<span class="err">`</span><span class="na">正在访问</span><span class="err">：${</span><span class="na">selectedLink</span><span class="err">.</span><span class="na">name</span><span class="err">}`,</span> <span class="na">false</span><span class="err">,</span> <span class="na">2000</span>);
+
+<span class="w">          </span><span class="c">// 延迟跳转，让用户看到提示</span>
+<span class="w">          </span><span class="nt">setTimeout</span>(<span class="err">(</span>) =&gt; {
+<span class="w">            </span><span class="nt">window</span><span class="nc">.open</span>(<span class="na">selectedLink</span><span class="err">.</span><span class="na">link</span><span class="err">,</span> <span class="err">'</span><span class="na">_blank</span><span class="err">'</span>);
+<span class="w">          </span><span class="err">}, </span><span class="nt">500</span>);
+
+<span class="w">        </span><span class="err">} </span><span class="nt">catch</span> (error) {
+<span class="w">          </span><span class="nt">console</span><span class="nc">.error</span>(<span class="err">'</span><span class="na">随机访问出错:</span><span class="err">',</span> <span class="na">error</span>);
+<span class="w">          </span><span class="nt">anzhiyu</span><span class="nc">.snackbarShow</span>(<span class="err">'</span><span class="na">随机访问功能出错</span><span class="err">'</span>);
+<span class="w">        </span><span class="err">}</span>
+<span class="w">      </span><span class="err">}</span>
+</pre></div>
+<h2 id="wen-jian-shuo-ming">文件说明</h2><p>这个 <code>flink.pug</code> 文件应该放置在以下路径：</p>
+<pre><code>f:\program\hexo\anzhiyu\themes\anzhiyu\layout\includes\page\flink.pug
+</code></pre>
+<p>使用时，只需要在你的页面 Front-matter 中添加相应的参数即可实现自定义数据源功能。</p>
+
+    </div>
+  </div>
+
+    </div>
+    
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/jcw-2002/" title="JCW'S GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://music.163.com/#/user/home?id=1654208892/" title="我的网易云音乐"
+            ><i class="fa fa-music" aria-hidden="true"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/program/mlink/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../license/">License & Copyright</a> •
+          <a href="../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>

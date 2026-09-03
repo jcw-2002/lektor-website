@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../../../static/styles.css?h=49e864fa">
+  <link rel="stylesheet" href="../../../../static/pygments.css">
+  <link rel="shortcut icon" href="../../../../static/favicon.png?h=fa09bedd">
+  <title>Gallery 展示页面改动说明 | The Transcript | 欢迎来到我的博客</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../../../">W JC</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li><a href="../../../../program/">18🈲</a></li>
+          
+            <li><a href="../../../../web/">Web</a></li>
+          
+            <li><a href="../../../../links/">友链</a></li>
+          
+            <li><a href="../../../../quotes/">语录</a></li>
+          
+            <li><a href="../../../../about/">关于我</a></li>
+          
+            <li class="active"><a href="../../../">更新</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+  <div class="blog-post">
+    
+  
+    
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+      <div class="meta-bar">
+        <h1>Gallery 展示页面改动说明</h1>
+        <p class="meta">
+          by
+          
+            jcw
+          
+          on Wednesday, August 26, 2026
+        </p>
+      </div>
+    
+      </div>
+    </div>
+  </div>
+
+  
+  
+    
+      
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        <div class="text-block text-block-default">
+  <h1 id="gallery-zhan-shi-ye-mian-gai-dong-zong-jie">Gallery 展示页面改动总结</h1><blockquote>
+<p>项目路径：<code>f:\program\blog\lektor-website</code></p>
+</blockquote>
+<h2 id="yi-xu-qiu-bei-jing">一、需求背景</h2><p>用户希望基于 Lektor 博客系统，实现一个可自定义列数的图片/链接展示页面，并逐步演进出以下能力：</p>
+<ol>
+<li><strong>自定义列数</strong>：一排显示 N 个格子（默认 5 列，可自由设置 1~6）。</li>
+<li><strong>图片自适应缩放</strong>：图片固定高宽比、自动裁切，一排整齐。</li>
+<li><strong>无限嵌套</strong>：点开一个 gallery 格子进入子 gallery，子 gallery 里还能再嵌 gallery（目录式）。</li>
+<li><strong>带封面缩略图</strong>：嵌套的子 gallery 也有自己的名字和封面图。</li>
+<li><strong>点击跳转</strong>：<ul>
+<li>叶子条目有 <code>url</code> → 直接跳转外部链接（新窗口）。</li>
+<li>叶子条目无 <code>url</code> → 跳到详情页。</li>
+<li>子目录（gallery）→ 跳到子页面继续浏览。</li>
+</ul>
+</li>
+<li><strong>showcase 复用</strong>：showcase 也改用可调列数的 Grid 布局，但保留原内容与导航。</li>
+<li><strong>修复 Web 页图标 404</strong>：<code>content/web</code> 目录大写残留导致的 Lektor 构建缓存冲突。</li>
+</ol>
+<h2 id="er-he-xin-ji-zhi-lektor-yue-ding-shi">二、核心机制（Lektor 约定式）</h2><p>Lektor 中一个页面由三部分协作：</p>
+<table>
+<thead>
+<tr>
+  <th>部分</th>
+  <th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>content/&lt;path&gt;/contents.lr</code></td>
+  <td>页面内容，用 <code>_model: xxx</code> 声明使用哪个模型</td>
+</tr>
+<tr>
+  <td><code>models/&lt;model&gt;.ini</code></td>
+  <td>定义模型字段、子项模型、字段必填等</td>
+</tr>
+<tr>
+  <td><code>templates/&lt;model&gt;.html</code></td>
+  <td>页面渲染模板</td>
+</tr>
+</tbody>
+</table>
+<p>关键点：</p>
+<ul>
+<li><strong>列数</strong>：模板里用 CSS Grid + 变量 <code>--gallery-cols</code> 控制，<code>repeat(var(--gallery-cols, 5), 1fr)</code>。</li>
+<li><strong>嵌套</strong>：<code>[children] model = gallery-item</code> 是子项默认模型；子项可在自己的 <code>contents.lr</code> 里写 <code>_model: gallery</code> 覆盖成&quot;子目录&quot;，从而实现无限套娃。</li>
+<li><strong>可选 url</strong>：<code>url</code> 字段必须用 <code>type = string</code> 才能为空（<code>type = url</code> 时访问空值会报 <code>Missing URL</code> 错误）。</li>
+</ul>
+<h2 id="san-gai-dong-fang-an-yu-she-ji-wen-jian">三、改动方案与涉及文件</h2><h3 id="1-xin-jian-gallery-ye-mian-ke-diao-lie-shu-qian-tao-tiao-zhuan">1. 新建 Gallery 页面（可调列数 + 嵌套 + 跳转）</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>models/gallery.ini</code></td>
+  <td>Gallery 模型：含 <code>name</code>、<code>cover_image</code>、<code>columns</code> 字段；<code>[children] model = gallery-item</code></td>
+</tr>
+<tr>
+  <td><code>models/gallery-item.ini</code></td>
+  <td>叶子条目模型：<code>name</code>、<code>url</code>（string 可选）、<code>cover_image</code>、<code>description</code></td>
+</tr>
+<tr>
+  <td><code>templates/gallery.html</code></td>
+  <td>渲染模板：CSS Grid 布局；按子项类型决定点击目标（子目录内页 / 外部 URL / 详情页）</td>
+</tr>
+<tr>
+  <td><code>templates/gallery-item.html</code></td>
+  <td>叶子详情页模板：显示 name、description、可选外部链接</td>
+</tr>
+<tr>
+  <td><code>content/gallery/contents.lr</code></td>
+  <td>页面入口，<code>_model: gallery</code>，<code>columns: 5</code></td>
+</tr>
+<tr>
+  <td>`content/gallery/sample-one</td>
+  <td>two</td>
+  <td>three/`</td>
+  <td>示例叶子条目（临时演示）</td>
+</tr>
+<tr>
+  <td><code>content/gallery/sub-gallery/</code></td>
+  <td>嵌套子目录演示（含更深层嵌套）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-showcase-fu-yong-ke-diao-lie-shu">2. Showcase 复用可调列数</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>改动</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>models/showcase.ini</code></td>
+  <td>新增 <code>columns</code> 字段</td>
+</tr>
+<tr>
+  <td><code>templates/showcase.html</code></td>
+  <td>主体循环从 <code>batch(2)</code> + <code>col-md-6</code> 改为复用的 <code>.gallery</code> Grid 布局</td>
+</tr>
+<tr>
+  <td><code>content/showcase/contents.lr</code></td>
+  <td>新增 <code>columns: 3</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-web-qian-tao-ye-mian">3. Web 嵌套页面</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>content/Web/</code> → <code>content/web/</code></td>
+  <td>顶层目录改为小写（其他顶层目录均为小写）</td>
+</tr>
+<tr>
+  <td><code>content/web/contents.lr</code></td>
+  <td><code>_model: gallery</code>，name、cover_image、columns</td>
+</tr>
+<tr>
+  <td><code>content/web/AI/contents.lr</code></td>
+  <td>AI 子目录（gallery），含封面图</td>
+</tr>
+<tr>
+  <td>`content/web/AI/claude</td>
+  <td>deepseek</td>
+  <td>doubao</td>
+  <td>gemini</td>
+  <td>kimi</td>
+  <td>openai/`</td>
+  <td>6 个叶子条目（各自有 url + 封面图）</td>
+</tr>
+<tr>
+  <td><code>content/web/AI/sub-gallery/</code></td>
+  <td>嵌套子目录演示</td>
+</tr>
+<tr>
+  <td><code>content/web/Tools/</code></td>
+  <td>Tools 子目录（gallery）</td>
+</tr>
+<tr>
+  <td>`content/web/Tools/figma</td>
+  <td>github</td>
+  <td>notion/`</td>
+  <td>工具叶子条目</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-yang-shi-css-grid">4. 样式（CSS Grid）</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>webpack/scss/main.scss</code></td>
+  <td>新增 <code>div.gallery</code> 的 Grid 布局（可变列数、<code>aspect-ratio</code> 自适应缩放、hover 效果）</td>
+</tr>
+<tr>
+  <td><code>assets/static/styles.css</code></td>
+  <td>SCSS 编译产物（已由 <code>npx webpack</code> 重新生成）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-dao-hang">5. 导航</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>databags/menu.ini</code></td>
+  <td>新增 <code>[gallery]</code>、<code>[links]</code> 导航项</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6-web-tu-biao-404-xiu-fu-da-xiao-xie-huan-cun-chong-tu">6. Web 图标 404 修复（大小写缓存冲突）</h3><table>
+<thead>
+<tr>
+  <th>文件/位置</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>content/Web</code> → <code>content/web</code></td>
+  <td>顶层目录改小写</td>
+</tr>
+<tr>
+  <td><code>content/web/AI/cover.png</code></td>
+  <td>补齐 AI 封面图（修复 <code>cover_image: cover.png</code> 引用不存在的文件）</td>
+</tr>
+<tr>
+  <td><code>C:\Users\jcw\AppData\Local\Lektor\Cache\builds\e8b1...\</code></td>
+  <td><strong>删除 Lektor server 系统缓存 build 目录</strong>，清除旧的大写 <code>Web</code> 残留记录</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>根因：早期用大写 <code>Web</code> 目录跑过 <code>lektor server</code>，其默认输出路径 <code>%LOCALAPPDATA%\Lektor\Cache\builds\&lt;id&gt;\</code> 的 buildstate 记录了 <code>Web/...</code> 大写路径；改成小写 <code>web</code> 后新旧记录冲突，prune 阶段误删图片 → 图标 404。</p>
+</blockquote>
+<h2 id="si-guan-jian-shi-xian-pian-duan">四、关键实现片段</h2><h3 id="gallery-mo-ban-he-xin-dian-ji-mu-biao-pan-duan">Gallery 模板核心（点击目标判断）</h3><div class="hll"><pre><span></span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">is_subgallery</span> <span class="o">=</span> <span class="nv">item.children</span> <span class="cp">%}</span>
+<span class="cp">{%</span> <span class="k">set</span> <span class="nv">has_external</span> <span class="o">=</span> <span class="nv">item.url</span> <span class="k">and</span> <span class="k">not</span> <span class="nv">is_subgallery</span> <span class="cp">%}</span>
+<span class="cp">{%</span> <span class="k">if</span> <span class="nv">has_external</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">target_href</span> <span class="o">=</span> <span class="nv">item.url</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">target_attrs</span> <span class="o">=</span> <span class="s1">' target="_blank" rel="noopener noreferrer"'</span> <span class="cp">%}</span>
+<span class="cp">{%</span> <span class="k">else</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">target_href</span> <span class="o">=</span> <span class="nv">item</span><span class="o">|</span><span class="nf">url</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">target_attrs</span> <span class="o">=</span> <span class="s1">''</span> <span class="cp">%}</span>
+<span class="cp">{%</span> <span class="k">endif</span> <span class="cp">%}</span>
+<span class="x">&lt;a href="</span><span class="cp">{{</span> <span class="nv">target_href</span> <span class="cp">}}</span><span class="x">"</span><span class="cp">{{</span> <span class="nv">target_attrs</span> <span class="o">|</span> <span class="nf">safe</span> <span class="cp">}}</span><span class="x">&gt;</span>
+<span class="x">  &lt;h2&gt;</span><span class="cp">{{</span> <span class="nv">item.name</span> <span class="cp">}}</span><span class="x">&lt;/h2&gt;</span>
+<span class="x">  &lt;img src="</span><span class="cp">{{</span> <span class="nv">img.thumbnail</span><span class="o">(</span><span class="m">480</span><span class="o">)|</span><span class="nf">url</span> <span class="cp">}}</span><span class="x">" alt=""&gt;</span>
+<span class="x">&lt;/a&gt;</span>
+</pre></div>
+<h3 id="css-grid-ke-bian-lie-shu">CSS Grid 可变列数</h3><div class="hll"><pre><span></span><span class="nt">div</span><span class="nc">.gallery</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">display</span><span class="nd">:</span><span class="w"> </span><span class="nt">grid</span><span class="o">;</span>
+<span class="w">  </span><span class="nt">grid-template-columns</span><span class="nd">:</span><span class="w"> </span><span class="nt">repeat</span><span class="o">(</span><span class="nt">var</span><span class="o">(</span><span class="nt">--gallery-cols</span><span class="o">,</span><span class="w"> </span><span class="nt">5</span><span class="o">),</span><span class="w"> </span><span class="nt">1fr</span><span class="o">);</span>
+<span class="w">  </span><span class="nt">gap</span><span class="nd">:</span><span class="w"> </span><span class="nt">20px</span><span class="o">;</span>
+<span class="w">  </span><span class="nt">img</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">width</span><span class="nd">:</span><span class="w"> </span><span class="nt">100</span><span class="err">%</span><span class="o">;</span>
+<span class="w">    </span><span class="nt">aspect-ratio</span><span class="nd">:</span><span class="w"> </span><span class="nt">16</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nt">10</span><span class="o">;</span>
+<span class="w">    </span><span class="nt">object-fit</span><span class="nd">:</span><span class="w"> </span><span class="nt">cover</span><span class="o">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+<h2 id="wu-shi-yong-shuo-ming">五、使用说明</h2><ul>
+<li><strong>调整列数</strong>：修改 <code>content/&lt;gallery或web或links&gt;/contents.lr</code> 里的 <code>columns: N</code>。</li>
+<li><strong>叶子跳外链</strong>：子项 <code>contents.lr</code> 写 <code>url: https://...</code>；不写则跳详情页。</li>
+<li><strong>嵌套子目录</strong>：子项 <code>contents.lr</code> 写 <code>_model: gallery</code> 即可继续嵌套。</li>
+<li><strong>每次改动后</strong>：重启 <code>uv run lektor server -f webpack</code>（如涉及新图片，重启以生成缩略图）。</li>
+</ul>
+<h2 id="liu-yi-liu/dai-que-ren">六、遗留 / 待确认</h2><ul>
+<li><code>content/web</code> 与新建的 <code>content/links</code> 并存；若统一用 links，可删除 <code>content/web</code> 并移除 <code>menu.ini</code> 的 <code>[web]</code>。</li>
+<li><code>content/gallery</code> 下的 <code>sample-one/two/three</code> 为临时示例，可按需删除。</li>
+<li>Tools 目录封面图当前为占位图，建议替换为真实图标。</li>
+</ul>
+
+</div>
+      </div>
+    </div>
+  </div>
+
+    
+  
+
+
+    
+    
+    
+    <div class="container">
+      <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+        
+          <div class="nav-prev">
+            <a href="../program-sidebar-categories/">Previous: Program 侧边栏分类折叠改动说明</a>
+          </div>
+        
+        
+          <div class="nav-next">
+            <a href="../../9/img-wall-categories/">Next: 图片墙分类展示改动说明</a>
+          </div>
+        
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/jcw-2002/" title="JCW'S GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://music.163.com/#/user/home?id=1654208892/" title="我的网易云音乐"
+            ><i class="fa fa-music" aria-hidden="true"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/update/gallery-summary/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../../../license/">License & Copyright</a> •
+          <a href="../../../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>

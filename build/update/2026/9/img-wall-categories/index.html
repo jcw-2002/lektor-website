@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../../../static/styles.css?h=49e864fa">
+  <link rel="stylesheet" href="../../../../static/pygments.css">
+  <link rel="shortcut icon" href="../../../../static/favicon.png?h=fa09bedd">
+  <title>图片墙分类展示改动说明 | The Transcript | 欢迎来到我的博客</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../../../">W JC</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li><a href="../../../../program/">18🈲</a></li>
+          
+            <li><a href="../../../../web/">Web</a></li>
+          
+            <li><a href="../../../../links/">友链</a></li>
+          
+            <li><a href="../../../../quotes/">语录</a></li>
+          
+            <li><a href="../../../../about/">关于我</a></li>
+          
+            <li class="active"><a href="../../../">更新</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+  <div class="blog-post">
+    
+  
+    
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+      <div class="meta-bar">
+        <h1>图片墙分类展示改动说明</h1>
+        <p class="meta">
+          by
+          
+            jcw
+          
+          on Friday, September 4, 2026
+        </p>
+      </div>
+    
+      </div>
+    </div>
+  </div>
+
+  
+  
+    
+      
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        <div class="text-block text-block-default">
+  <h1 id="tu-pian-qiang-fen-lei-zhan-shi-gai-dong-zong-jie">图片墙分类展示 改动总结</h1><blockquote>
+<p>项目路径：<code>f:\program\blog\lektor-website</code></p>
+</blockquote>
+<h2 id="yi-xu-qiu-bei-jing">一、需求背景</h2><p>为站点新增一个「图片墙」页面，用于集中展示照片：</p>
+<ol>
+<li><strong>比例归一</strong>：不论原图像素多大，上传后按比例就近归入三种固定规格之一——横屏 4:3、方形 1:1、竖屏 3:4，显示时用 <code>object-fit: cover</code> 裁切，原图保留不动。</li>
+<li><strong>均匀铺满</strong>：同比例图片在页面中尺寸完全一致，按行排列后每行正好铺满页面宽度（横屏 3 张/行、方形与竖屏 4 张/行），行类型轮换穿插。</li>
+<li><strong>分类浏览</strong>：进入图片墙先看到分类页，布局与 <code>_model: gallery</code> 一致，一行放 3 个类别卡片（名称 + 封面）；点击类别进入该类的图片墙。</li>
+</ol>
+<h2 id="er-shi-xian-fang-an">二、实现方案</h2><ul>
+<li><strong>比例归类</strong>：Lektor 附件自带 <code>img.width / img.height</code>，模板中计算宽高比，与 4/3、1、3/4 比较取最近者（阈值 1.167 / 0.875），自动分类，无需手动标记。</li>
+<li><strong>分行渲染</strong>：Jinja 中按类别分组、按固定张数切块成行，输出 <code>row-landscape</code> / <code>row-square</code> / <code>row-portrait</code> 三种行；CSS Grid 每行 <code>repeat(3/4, 1fr)</code>，配合 <code>aspect-ratio</code> 固定形状，行行铺满无空隙。</li>
+<li><strong>分类结构</strong>：入口页直接复用现有 <code>gallery</code> 模型与 <code>gallery.html</code> 模板（<code>columns: 3</code>）；类别页用新建的 <code>img-category</code> 模型，套用图片墙模板渲染自身附件图片。</li>
+<li><strong>移动端</strong>：窄屏（≤768px）统一降为 2 列，保持各自比例。</li>
+<li><strong>纯 CSS 实现</strong>：无 JS、无物理裁剪脚本，缩略图统一 <code>thumbnail(640)</code> 控制体积。</li>
+</ul>
+<h2 id="san-she-ji-wen-jian">三、涉及文件</h2><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>改动</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>templates/img-wall.html</code></td>
+  <td>新增：图片墙模板（比例归类 + 分行渲染 + 返回链接）</td>
+</tr>
+<tr>
+  <td><code>models/img-category.ini</code></td>
+  <td>新增：类别模型（<code>name</code> 字段）</td>
+</tr>
+<tr>
+  <td><code>webpack/scss/main.scss</code></td>
+  <td>末尾追加 <code>.img-wall</code> 样式（三种行布局 + 响应式），已重新构建</td>
+</tr>
+<tr>
+  <td><code>content/img/contents.lr</code></td>
+  <td>入口页：<code>_model: gallery</code> + <code>columns: 3</code></td>
+</tr>
+<tr>
+  <td><code>content/img/party/</code> 等 3 个目录</td>
+  <td>三个类别，<code>_model: img-category</code> + <code>_template: img-wall.html</code>，图片以附件形式直接放入目录</td>
+</tr>
+</tbody>
+</table>
+<h2 id="si-zhu-yi-shi-xiang-shang-chuan-tu-pian-xu-zhi">四、注意事项（上传图片须知）</h2><ol>
+<li>文件名避免 <code>%</code> <code>]</code> <code>~</code> <code>{}</code> 等字符（<code>%</code> 会导致浏览器 URL 解析破图，个别字符会导致 Lektor 构建失败），不要用 <code>_</code> 开头（会被 Lektor 当隐藏文件忽略）。</li>
+<li>新增图片只需把文件拖进对应类别目录，重新构建即可，无需为单张图片建子页面。</li>
+<li>收尾行（图片不足一行时）目前靠左对齐，如需居中改一行 CSS 即可。</li>
+</ol>
+
+</div>
+      </div>
+    </div>
+  </div>
+
+    
+  
+
+
+    
+    
+    
+    <div class="container">
+      <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+        
+          <div class="nav-prev">
+            <a href="../../8/gallery-summary/">Previous: Gallery 展示页面改动说明</a>
+          </div>
+        
+        
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/jcw-2002/" title="JCW'S GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://music.163.com/#/user/home?id=1654208892/" title="我的网易云音乐"
+            ><i class="fa fa-music" aria-hidden="true"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/update/img-wall-categories/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../../../license/">License & Copyright</a> •
+          <a href="../../../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>

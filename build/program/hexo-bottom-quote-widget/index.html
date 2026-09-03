@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../static/styles.css?h=49e864fa">
+  <link rel="stylesheet" href="../../static/pygments.css">
+  <link rel="shortcut icon" href="../../static/favicon.png?h=fa09bedd">
+  <title>页面底部添加语句 | 欢迎来到我的博客</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../">W JC</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li class="active"><a href="../">18🈲</a></li>
+          
+            <li><a href="../../web/">Web</a></li>
+          
+            <li><a href="../../links/">友链</a></li>
+          
+            <li><a href="../../quotes/">语录</a></li>
+          
+            <li><a href="../../about/">关于我</a></li>
+          
+            <li><a href="../../update/">更新</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+    <div class="container">
+      
+  <div class="row">
+    <div class="col-sm-3">
+      
+  
+    
+  
+
+  
+  
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+
+  
+  
+  
+    
+      
+      
+    
+  
+    
+      
+      
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+
+  <ul class="tree-nav nocontent">
+    <li><a href="../">编程</a></li>
+
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+      <li class="tree-group">
+        <details>
+          <summary class="tree-group-title">Python</summary>
+          <ul class="tree-group-items">
+            
+              
+                <li><a href="../conda/">Conda 环境管理</a></li>
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+          
+        
+      
+      <li class="tree-group">
+        <details open>
+          <summary class="tree-group-title">博客</summary>
+          <ul class="tree-group-items">
+            
+              
+            
+              
+                <li><a href="../mlink/">Hexo AnZhiYu主题友链页面自定义数据源功能实现</a></li>
+              
+            
+              
+                <li><a href="../hexo-cloud/">Hexo 博客部署到云服务器完整教程</a></li>
+              
+            
+              
+                <li><a href="../hexo-vercel-deploy/">Hexo 博客零成本部署到 Vercel 完整指南</a></li>
+              
+            
+              
+                <li><a href="../swiper-fix/">解决安知鱼主题轮播图无法正常播放问题</a></li>
+              
+            
+              
+                <li class="active"><a href="./">页面底部添加语句</a></li>
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+
+    
+    
+      <li><a href="../git-update/">Git 更新仓库</a></li>
+    
+      <li><a href="../lektor/">lektor 操作</a></li>
+    
+  </ul>
+
+    </div>
+    <div class="col-sm-9 doc-styling">
+      <h1>页面底部添加语句</h1>
+      
+      <p>为 Hexo 安知鱼主题添加一个优雅的底部语句功能，支持自动刷新、手动复制和自定义语句管理。</p>
+<h2 id="gong-neng-te-xing">功能特性</h2><ul>
+<li>🎯 固定底部显示随机语句</li>
+<li>🔄 每10秒自动刷新语句</li>
+<li>📋 左键点击复制语句到剪贴板</li>
+<li>🔃 右键点击手动刷新语句</li>
+<li>📝 支持从JSON文件动态加载语句</li>
+<li>🎨 完美适配安知鱼主题样式</li>
+<li>📱 响应式设计，移动端友好</li>
+</ul>
+<h2 id="an-zhuang-bu-zou">安装步骤</h2><h3 id="1-chuang-jian-javascript-wen-jian">1. 创建 JavaScript 文件</h3><p>在 <code>source/custom/js/</code> 目录下创建 <code>random-quote.js</code> 文件：</p>
+<div class="hll"><pre><span></span><span class="nb">document</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s1">'DOMContentLoaded'</span><span class="p">,</span><span class="w"> </span><span class="kd">function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// 预定义语句数组（作为fallback）</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">fallbackQuotes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">"生活不是等待暴风雨过去，而是要学会在雨中跳舞。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"每一个不曾起舞的日子，都是对生命的辜负。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"世界上最遥远的距离，不是生与死，而是我站在你面前，你却不知道我爱你。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"人生如逆旅，我亦是行人。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"山有木兮木有枝，心悦君兮君不知。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"落红不是无情物，化作春泥更护花。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"海内存知己，天涯若比邻。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"路漫漫其修远兮，吾将上下而求索。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"不是每一次努力都会有收获，但是每一次收获都必须努力。"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"愿你走出半生，归来仍是少年。"</span>
+<span class="w">    </span><span class="p">];</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="nx">quotes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">fallbackQuotes</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="nx">autoRefreshInterval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="nx">currentQuoteText</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">''</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 从JSON文件加载语句</span>
+<span class="w">    </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">loadQuotesFromFile</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="s1">'/sentence/quotes.json'</span><span class="p">);</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">response</span><span class="p">.</span><span class="nx">ok</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="sb">`HTTP error! status: </span><span class="si">${</span><span class="nx">response</span><span class="p">.</span><span class="nx">status</span><span class="si">}</span><span class="sb">`</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">            </span><span class="kd">const</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">json</span><span class="p">();</span>
+
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">data</span><span class="p">.</span><span class="nx">quotes</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">Array</span><span class="p">.</span><span class="nx">isArray</span><span class="p">(</span><span class="nx">data</span><span class="p">.</span><span class="nx">quotes</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">quotes</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nx">quotes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">quotes</span><span class="p">;</span>
+<span class="w">                </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`成功加载 </span><span class="si">${</span><span class="nx">quotes</span><span class="p">.</span><span class="nx">length</span><span class="si">}</span><span class="sb"> 条语句`</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nx">console</span><span class="p">.</span><span class="nx">warn</span><span class="p">(</span><span class="s1">'JSON文件格式不正确或无有效语句，使用默认语句'</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">console</span><span class="p">.</span><span class="nx">warn</span><span class="p">(</span><span class="s1">'加载语句文件失败，使用默认语句:'</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">function</span><span class="w"> </span><span class="nx">getRandomQuote</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">randomIndex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Math</span><span class="p">.</span><span class="nx">floor</span><span class="p">(</span><span class="nb">Math</span><span class="p">.</span><span class="nx">random</span><span class="p">()</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">quotes</span><span class="p">.</span><span class="nx">length</span><span class="p">);</span>
+<span class="w">        </span><span class="nx">currentQuoteText</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">quotes</span><span class="p">[</span><span class="nx">randomIndex</span><span class="p">];</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="sb">`「 </span><span class="si">${</span><span class="nx">currentQuoteText</span><span class="si">}</span><span class="sb"> 」`</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">function</span><span class="w"> </span><span class="nx">updateQuote</span><span class="p">(</span><span class="nx">quoteElement</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">quoteElement</span><span class="p">.</span><span class="nx">style</span><span class="p">.</span><span class="nx">opacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'0.6'</span><span class="p">;</span>
+<span class="w">        </span><span class="nx">setTimeout</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">quoteElement</span><span class="p">.</span><span class="nx">textContent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getRandomQuote</span><span class="p">();</span>
+<span class="w">            </span><span class="nx">quoteElement</span><span class="p">.</span><span class="nx">style</span><span class="p">.</span><span class="nx">opacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'1'</span><span class="p">;</span>
+<span class="w">        </span><span class="p">},</span><span class="w"> </span><span class="mf">150</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 复制到剪贴板</span>
+<span class="w">    </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">copyToClipboard</span><span class="p">(</span><span class="nx">text</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">await</span><span class="w"> </span><span class="nx">navigator</span><span class="p">.</span><span class="nx">clipboard</span><span class="p">.</span><span class="nx">writeText</span><span class="p">(</span><span class="nx">text</span><span class="p">);</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kd">const</span><span class="w"> </span><span class="nx">textArea</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">'textarea'</span><span class="p">);</span>
+<span class="w">            </span><span class="nx">textArea</span><span class="p">.</span><span class="nx">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">text</span><span class="p">;</span>
+<span class="w">            </span><span class="nb">document</span><span class="p">.</span><span class="nx">body</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">textArea</span><span class="p">);</span>
+<span class="w">            </span><span class="nx">textArea</span><span class="p">.</span><span class="nx">select</span><span class="p">();</span>
+<span class="w">            </span><span class="kd">const</span><span class="w"> </span><span class="nx">success</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">document</span><span class="p">.</span><span class="nx">execCommand</span><span class="p">(</span><span class="s1">'copy'</span><span class="p">);</span>
+<span class="w">            </span><span class="nb">document</span><span class="p">.</span><span class="nx">body</span><span class="p">.</span><span class="nx">removeChild</span><span class="p">(</span><span class="nx">textArea</span><span class="p">);</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nx">success</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 显示复制反馈</span>
+<span class="w">    </span><span class="kd">function</span><span class="w"> </span><span class="nx">showCopyFeedback</span><span class="p">(</span><span class="nx">element</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">originalTitle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">element</span><span class="p">.</span><span class="nx">title</span><span class="p">;</span>
+<span class="w">        </span><span class="nx">element</span><span class="p">.</span><span class="nx">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'已复制到剪贴板！'</span><span class="p">;</span>
+<span class="w">        </span><span class="nx">element</span><span class="p">.</span><span class="nx">style</span><span class="p">.</span><span class="nx">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'var(--anzhiyu-green, #4CAF50)'</span><span class="p">;</span>
+
+<span class="w">        </span><span class="nx">setTimeout</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">element</span><span class="p">.</span><span class="nx">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">originalTitle</span><span class="p">;</span>
+<span class="w">            </span><span class="nx">element</span><span class="p">.</span><span class="nx">style</span><span class="p">.</span><span class="nx">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">''</span><span class="p">;</span>
+<span class="w">        </span><span class="p">},</span><span class="w"> </span><span class="mf">1500</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">function</span><span class="w"> </span><span class="nx">startAutoRefresh</span><span class="p">(</span><span class="nx">quoteElement</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">autoRefreshInterval</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">clearInterval</span><span class="p">(</span><span class="nx">autoRefreshInterval</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="nx">autoRefreshInterval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">setInterval</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">updateQuote</span><span class="p">(</span><span class="nx">quoteElement</span><span class="p">);</span>
+<span class="w">        </span><span class="p">},</span><span class="w"> </span><span class="mf">10000</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">function</span><span class="w"> </span><span class="nx">createQuoteContainer</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nb">document</span><span class="p">.</span><span class="nx">getElementById</span><span class="p">(</span><span class="s1">'fixed-quote-container'</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">return</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">'div'</span><span class="p">);</span>
+<span class="w">        </span><span class="nx">container</span><span class="p">.</span><span class="nx">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'fixed-quote-container'</span><span class="p">;</span>
+
+<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">quoteText</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">'div'</span><span class="p">);</span>
+<span class="w">        </span><span class="nx">quoteText</span><span class="p">.</span><span class="nx">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'random-quote'</span><span class="p">;</span>
+<span class="w">        </span><span class="nx">quoteText</span><span class="p">.</span><span class="nx">className</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'random-quote-text'</span><span class="p">;</span>
+<span class="w">        </span><span class="nx">quoteText</span><span class="p">.</span><span class="nx">textContent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getRandomQuote</span><span class="p">();</span>
+<span class="w">        </span><span class="nx">quoteText</span><span class="p">.</span><span class="nx">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'点击复制语句 | 每10秒自动刷新'</span><span class="p">;</span>
+
+<span class="w">        </span><span class="nx">container</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">quoteText</span><span class="p">);</span>
+<span class="w">        </span><span class="nb">document</span><span class="p">.</span><span class="nx">body</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">container</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// 左键复制</span>
+<span class="w">        </span><span class="nx">quoteText</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s1">'click'</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kd">const</span><span class="w"> </span><span class="nx">success</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">copyToClipboard</span><span class="p">(</span><span class="nx">currentQuoteText</span><span class="p">);</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">success</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nx">showCopyFeedback</span><span class="p">(</span><span class="k">this</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">});</span>
+
+<span class="w">        </span><span class="c1">// 右键刷新</span>
+<span class="w">        </span><span class="nx">quoteText</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s1">'contextmenu'</span><span class="p">,</span><span class="w"> </span><span class="kd">function</span><span class="p">(</span><span class="nx">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">e</span><span class="p">.</span><span class="nx">preventDefault</span><span class="p">();</span>
+<span class="w">            </span><span class="nx">updateQuote</span><span class="p">(</span><span class="k">this</span><span class="p">);</span>
+<span class="w">            </span><span class="nx">startAutoRefresh</span><span class="p">(</span><span class="k">this</span><span class="p">);</span>
+<span class="w">        </span><span class="p">});</span>
+
+<span class="w">        </span><span class="nx">startAutoRefresh</span><span class="p">(</span><span class="nx">quoteText</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 初始化</span>
+<span class="w">    </span><span class="nx">loadQuotesFromFile</span><span class="p">().</span><span class="nx">then</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">createQuoteContainer</span><span class="p">();</span>
+<span class="w">    </span><span class="p">});</span>
+
+<span class="w">    </span><span class="c1">// PJAX 兼容</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="ow">typeof</span><span class="w"> </span><span class="nx">pjax</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s1">'undefined'</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">document</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s1">'pjax:complete'</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">autoRefreshInterval</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nx">clearInterval</span><span class="p">(</span><span class="nx">autoRefreshInterval</span><span class="p">);</span>
+<span class="w">                </span><span class="nx">autoRefreshInterval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+
+<span class="w">            </span><span class="nx">loadQuotesFromFile</span><span class="p">().</span><span class="nx">then</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nx">createQuoteContainer</span><span class="p">();</span>
+<span class="w">            </span><span class="p">});</span>
+<span class="w">        </span><span class="p">});</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 页面卸载时清理</span>
+<span class="w">    </span><span class="nb">window</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s1">'beforeunload'</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">autoRefreshInterval</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">clearInterval</span><span class="p">(</span><span class="nx">autoRefreshInterval</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">});</span>
+<span class="p">});</span>
+</pre></div>
+<h3 id="2-chuang-jian-css-yang-shi-wen-jian">2. 创建 CSS 样式文件</h3><p>在 <code>source/custom/css/</code> 目录下创建 <code>random-quote.css</code> 文件：</p>
+<div class="hll"><pre><span></span><span class="p">#</span><span class="nn">fixed-quote-container</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">position</span><span class="p">:</span><span class="w"> </span><span class="kc">fixed</span><span class="p">;</span>
+<span class="w">  </span><span class="k">bottom</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="k">left</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="k">right</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="k">z-index</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">;</span>
+<span class="w">  </span><span class="k">background</span><span class="p">:</span><span class="w"> </span><span class="nb">linear-gradient</span><span class="p">(</span><span class="mi">135</span><span class="kt">deg</span><span class="p">,</span><span class="w"> </span><span class="nf">var</span><span class="p">(</span><span class="nv">--anzhiyu-main</span><span class="p">,</span><span class="w"> </span><span class="mh">#425AEF</span><span class="p">),</span><span class="w"> </span><span class="nf">var</span><span class="p">(</span><span class="nv">--anzhiyu-main-op</span><span class="p">,</span><span class="w"> </span><span class="nb">rgba</span><span class="p">(</span><span class="mi">66</span><span class="p">,</span><span class="w"> </span><span class="mi">90</span><span class="p">,</span><span class="w"> </span><span class="mi">239</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">)));</span>
+<span class="w">  </span><span class="n">backdrop-filter</span><span class="p">:</span><span class="w"> </span><span class="nb">blur</span><span class="p">(</span><span class="mi">10</span><span class="kt">px</span><span class="p">);</span>
+<span class="w">  </span><span class="k">border-top</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="kt">px</span><span class="w"> </span><span class="kc">solid</span><span class="w"> </span><span class="nf">var</span><span class="p">(</span><span class="nv">--anzhiyu-card-border</span><span class="p">,</span><span class="w"> </span><span class="nb">rgba</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span><span class="w"> </span><span class="mi">255</span><span class="p">,</span><span class="w"> </span><span class="mi">255</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">));</span>
+<span class="w">  </span><span class="k">padding</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="kt">px</span><span class="w"> </span><span class="mi">20</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">  </span><span class="k">text-align</span><span class="p">:</span><span class="w"> </span><span class="kc">center</span><span class="p">;</span>
+<span class="w">  </span><span class="k">box-shadow</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="mi">-2</span><span class="kt">px</span><span class="w"> </span><span class="mi">10</span><span class="kt">px</span><span class="w"> </span><span class="nb">rgba</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">);</span>
+<span class="w">  </span><span class="k">transition</span><span class="p">:</span><span class="w"> </span><span class="kc">all</span><span class="w"> </span><span class="mf">0.3</span><span class="kt">s</span><span class="w"> </span><span class="kc">ease</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="p">.</span><span class="nc">random-quote-text</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">color</span><span class="p">:</span><span class="w"> </span><span class="nf">var</span><span class="p">(</span><span class="nv">--anzhiyu-fontcolor</span><span class="p">,</span><span class="w"> </span><span class="mh">#333</span><span class="p">);</span>
+<span class="w">  </span><span class="k">font-size</span><span class="p">:</span><span class="w"> </span><span class="mi">14</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">  </span><span class="k">font-style</span><span class="p">:</span><span class="w"> </span><span class="kc">italic</span><span class="p">;</span>
+<span class="w">  </span><span class="k">margin</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="k">padding</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="k">transition</span><span class="p">:</span><span class="w"> </span><span class="kc">all</span><span class="w"> </span><span class="mf">0.3</span><span class="kt">s</span><span class="w"> </span><span class="kc">ease</span><span class="p">;</span>
+<span class="w">  </span><span class="k">cursor</span><span class="p">:</span><span class="w"> </span><span class="kc">pointer</span><span class="p">;</span>
+<span class="w">  </span><span class="k">line-height</span><span class="p">:</span><span class="w"> </span><span class="mf">1.5</span><span class="p">;</span>
+<span class="w">  </span><span class="k">user-select</span><span class="p">:</span><span class="w"> </span><span class="kc">none</span><span class="p">;</span>
+<span class="w">  </span><span class="k">position</span><span class="p">:</span><span class="w"> </span><span class="kc">relative</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="p">.</span><span class="nc">random-quote-text</span><span class="p">:</span><span class="nd">hover</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">color</span><span class="p">:</span><span class="w"> </span><span class="nf">var</span><span class="p">(</span><span class="nv">--anzhiyu-white</span><span class="p">,</span><span class="w"> </span><span class="mh">#fff</span><span class="p">);</span>
+<span class="w">  </span><span class="k">transform</span><span class="p">:</span><span class="w"> </span><span class="nb">scale</span><span class="p">(</span><span class="mf">1.02</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="p">.</span><span class="nc">random-quote-text</span><span class="p">:</span><span class="nd">active</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">transform</span><span class="p">:</span><span class="w"> </span><span class="nb">scale</span><span class="p">(</span><span class="mf">0.98</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="p">.</span><span class="nc">random-quote-text</span><span class="p">:</span><span class="nd">hover</span><span class="p">::</span><span class="nd">after</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">content</span><span class="p">:</span><span class="w"> </span><span class="s1">'点击左键复制，点击右键刷新'</span><span class="p">;</span>
+<span class="w">  </span><span class="k">position</span><span class="p">:</span><span class="w"> </span><span class="kc">absolute</span><span class="p">;</span>
+<span class="w">  </span><span class="k">top</span><span class="p">:</span><span class="w"> </span><span class="mi">-35</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">  </span><span class="k">left</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="kt">%</span><span class="p">;</span>
+<span class="w">  </span><span class="k">transform</span><span class="p">:</span><span class="w"> </span><span class="nb">translateX</span><span class="p">(</span><span class="mi">-50</span><span class="kt">%</span><span class="p">);</span>
+<span class="w">  </span><span class="k">background</span><span class="p">:</span><span class="w"> </span><span class="nb">rgba</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8</span><span class="p">);</span>
+<span class="w">  </span><span class="k">color</span><span class="p">:</span><span class="w"> </span><span class="kc">white</span><span class="p">;</span>
+<span class="w">  </span><span class="k">padding</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="kt">px</span><span class="w"> </span><span class="mi">8</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">  </span><span class="k">border-radius</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">  </span><span class="k">font-size</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">  </span><span class="k">font-style</span><span class="p">:</span><span class="w"> </span><span class="kc">normal</span><span class="p">;</span>
+<span class="w">  </span><span class="k">white-space</span><span class="p">:</span><span class="w"> </span><span class="kc">nowrap</span><span class="p">;</span>
+<span class="w">  </span><span class="k">pointer-events</span><span class="p">:</span><span class="w"> </span><span class="kc">none</span><span class="p">;</span>
+<span class="w">  </span><span class="k">opacity</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="k">animation</span><span class="p">:</span><span class="w"> </span><span class="n">fadeInUp</span><span class="w"> </span><span class="mf">0.3</span><span class="kt">s</span><span class="w"> </span><span class="kc">ease</span><span class="w"> </span><span class="kc">forwards</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="p">@</span><span class="k">keyframes</span><span class="w"> </span><span class="nt">fadeInUp</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">from</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">opacity</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">transform</span><span class="p">:</span><span class="w"> </span><span class="nb">translateX</span><span class="p">(</span><span class="mi">-50</span><span class="kt">%</span><span class="p">)</span><span class="w"> </span><span class="nb">translateY</span><span class="p">(</span><span class="mi">5</span><span class="kt">px</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="nt">to</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">opacity</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">transform</span><span class="p">:</span><span class="w"> </span><span class="nb">translateX</span><span class="p">(</span><span class="mi">-50</span><span class="kt">%</span><span class="p">)</span><span class="w"> </span><span class="nb">translateY</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="nt">body</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">padding-bottom</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="kt">px</span><span class="w"> </span><span class="cp">!important</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">[</span><span class="nt">data-theme</span><span class="o">=</span><span class="s2">"dark"</span><span class="o">]</span><span class="w"> </span><span class="p">#</span><span class="nn">fixed-quote-container</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">background</span><span class="p">:</span><span class="w"> </span><span class="nb">linear-gradient</span><span class="p">(</span><span class="mi">135</span><span class="kt">deg</span><span class="p">,</span><span class="w"> </span><span class="nf">var</span><span class="p">(</span><span class="nv">--anzhiyu-main</span><span class="p">,</span><span class="w"> </span><span class="mh">#425AEF</span><span class="p">),</span><span class="w"> </span><span class="nb">rgba</span><span class="p">(</span><span class="mi">66</span><span class="p">,</span><span class="w"> </span><span class="mi">90</span><span class="p">,</span><span class="w"> </span><span class="mi">239</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2</span><span class="p">));</span>
+<span class="w">  </span><span class="k">border-top-color</span><span class="p">:</span><span class="w"> </span><span class="nf">var</span><span class="p">(</span><span class="nv">--anzhiyu-card-border</span><span class="p">,</span><span class="w"> </span><span class="nb">rgba</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span><span class="w"> </span><span class="mi">255</span><span class="p">,</span><span class="w"> </span><span class="mi">255</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">));</span>
+<span class="p">}</span>
+
+<span class="p">@</span><span class="k">media</span><span class="w"> </span><span class="nt">screen</span><span class="w"> </span><span class="nt">and</span><span class="w"> </span><span class="o">(</span><span class="nt">max-width</span><span class="o">:</span><span class="w"> </span><span class="nt">768px</span><span class="o">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="p">#</span><span class="nn">fixed-quote-container</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">padding</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="kt">px</span><span class="w"> </span><span class="mi">15</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="p">.</span><span class="nc">random-quote-text</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">font-size</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="kt">px</span><span class="p">;</span>
+<span class="w">    </span><span class="k">line-height</span><span class="p">:</span><span class="w"> </span><span class="mf">1.4</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nt">body</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">padding-bottom</span><span class="p">:</span><span class="w"> </span><span class="mi">45</span><span class="kt">px</span><span class="w"> </span><span class="cp">!important</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+<h3 id="3-chuang-jian-yu-ju-shu-ju-wen-jian">3. 创建语句数据文件</h3><p>在 <code>source/sentence/</code> 目录下创建 <code>quotes.json</code> 文件：</p>
+<div class="hll"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"quotes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"遇事不决，可问春风，春风不语，既随本心。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"难道是因为当初有话没讲完，堵在喉咙里却始终不敢大声喊。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"我大抵是病了，明明太阳照射到地球上有那么大的面积，我却时常关注那些灰暗阴沉的角落。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"情话和关心像传单一样乱发，暧昧也和破烂一样廉价。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"山有木兮木有枝，心悦君兮君不知。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"我渐渐学会了向前看，慢慢的不再是个念旧的人。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"怀疑一旦产生，罪名就已经成立。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"就像手指着月亮，不要把注意力放在手指上，否则你将会错过所有月亮的光华。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"人各不同，所以我才是我，人才是人。"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"染于苍则苍，染于黄则黄。所入者变，其色亦变。"</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+<h3 id="4-pei-zhi-zhu-ti-wen-jian">4. 配置主题文件</h3><p>在主题配置文件 <code>_config.anzhiyu.yml</code> 中添加引用：</p>
+<div class="hll"><pre><span></span><span class="nt">inject</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">head</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;link rel="stylesheet" href="/custom/css/random-quote.css" media="defer" onload="this.media='all'"&gt;</span>
+<span class="w">  </span><span class="nt">bottom</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;script src="/custom/js/random-quote.js"&gt;&lt;/script&gt;</span>
+</pre></div>
+<h2 id="shi-yong-shuo-ming">使用说明</h2><h3 id="ji-ben-cao-zuo">基本操作</h3><ul>
+<li><strong>自动刷新</strong>：语句每10秒自动更新</li>
+<li><strong>手动复制</strong>：左键点击语句复制到剪贴板（不含装饰符号）</li>
+<li><strong>手动刷新</strong>：右键点击语句立即刷新</li>
+<li><strong>视觉反馈</strong>：鼠标悬停显示操作提示</li>
+</ul>
+<h3 id="zi-ding-yi-yu-ju">自定义语句</h3><p>编辑 <code>source/sentence/quotes.json</code> 文件，在 <code>quotes</code> 数组中添加、删除或修改语句：</p>
+<div class="hll"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"quotes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"你的自定义语句1"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"你的自定义语句2"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"..."</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+<p>修改后重新生成站点即可生效。</p>
+<h3 id="yang-shi-zi-ding-yi">样式自定义</h3><p>可以通过修改 CSS 文件中的变量来调整样式：</p>
+<ul>
+<li>调整位置：修改 <code>bottom</code>、<code>left</code>、<code>right</code> 属性</li>
+<li>调整颜色：使用安知鱼主题变量或自定义颜色</li>
+<li>调整字体：修改 <code>font-size</code>、<code>font-style</code> 等属性</li>
+</ul>
+<h2 id="zhu-yi-shi-xiang">注意事项</h2><ol>
+<li>确保 <code>source/custom/</code> 和 <code>source/sentence/</code> 目录存在</li>
+<li>JSON 文件格式必须正确，注意逗号和引号</li>
+<li>如果加载外部文件失败，会自动使用内置的默认语句</li>
+<li>支持 PJAX，页面切换时会自动重新初始化</li>
+</ol>
+<h2 id="xiao-guo-yu-lan">效果预览</h2><p>安装完成后，你会在页面底部看到一个优雅的语句栏，语句格式为：</p>
+<pre><code>「 你的语句内容 」
+</code></pre>
+<p>功能完整，体验流畅，完美融入安知鱼主题的设计风格。</p>
+<h2 id="gu-zhang-pai-chu">故障排除</h2><ul>
+<li><strong>语句不显示</strong>：检查 JavaScript 文件路径和语法</li>
+<li><strong>样式异常</strong>：检查 CSS 文件路径和主题兼容性</li>
+<li><strong>语句不更新</strong>：检查 JSON 文件格式和网络访问</li>
+<li><strong>复制失败</strong>：检查浏览器兼容性和权限设置</li>
+</ul>
+
+    </div>
+  </div>
+
+    </div>
+    
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/jcw-2002/" title="JCW'S GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://music.163.com/#/user/home?id=1654208892/" title="我的网易云音乐"
+            ><i class="fa fa-music" aria-hidden="true"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/program/hexo-bottom-quote-widget/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../license/">License & Copyright</a> •
+          <a href="../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>

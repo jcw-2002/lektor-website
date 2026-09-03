@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../../../static/styles.css?h=49e864fa">
+  <link rel="stylesheet" href="../../../../static/pygments.css">
+  <link rel="shortcut icon" href="../../../../static/favicon.png?h=fa09bedd">
+  <title>Program 侧边栏分类折叠改动说明 | The Transcript | 欢迎来到我的博客</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../../../">W JC</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li><a href="../../../../program/">18🈲</a></li>
+          
+            <li><a href="../../../../web/">Web</a></li>
+          
+            <li><a href="../../../../links/">友链</a></li>
+          
+            <li><a href="../../../../quotes/">语录</a></li>
+          
+            <li><a href="../../../../about/">关于我</a></li>
+          
+            <li class="active"><a href="../../../">更新</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+  <div class="blog-post">
+    
+  
+    
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+      <div class="meta-bar">
+        <h1>Program 侧边栏分类折叠改动说明</h1>
+        <p class="meta">
+          by
+          
+            jcw
+          
+          on Wednesday, August 26, 2026
+        </p>
+      </div>
+    
+      </div>
+    </div>
+  </div>
+
+  
+  
+    
+      
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        <div class="text-block text-block-default">
+  <h1 id="program-ce-bian-lan-fen-lei-zhe-die-gai-dong-zong-jie">Program 侧边栏分类折叠 改动总结</h1><blockquote>
+<p>项目路径：<code>f:\program\blog\lektor-website</code></p>
+</blockquote>
+<h2 id="yi-xu-qiu-bei-jing">一、需求背景</h2><p>用户基于 Lektor 博客系统，希望 <code>content/program</code>（编程专栏）左侧导航栏按&quot;板块大类&quot;分组展示文章：</p>
+<ol>
+<li><strong>按分类分组</strong>：文章通过 <code>category</code> 字段归入某个大板块（如 <code>Python</code>、<code>博客</code>），侧边栏显示板块标题，隐藏其下的子文章。</li>
+<li><strong>点击折叠展开</strong>：点击板块标题时向下展开该板块的文章列表。</li>
+<li><strong>未分类兼容</strong>：如果文章<strong>没有</strong> <code>category</code>（null/空），则不分组，直接平铺显示在所有分类组之后，<strong>不报错、不放进&quot;未分类&quot;组</strong>（null 不是分类，可有多篇 null 文章）。</li>
+</ol>
+<h2 id="er-he-xin-ji-zhi">二、核心机制</h2><p>Lektor 中一个页面由三部分协作：</p>
+<table>
+<thead>
+<tr>
+  <th>部分</th>
+  <th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>content/&lt;path&gt;/contents.lr</code></td>
+  <td>页面内容，用 <code>_model: xxx</code> 声明模型，并填写字段</td>
+</tr>
+<tr>
+  <td><code>models/&lt;model&gt;.ini</code></td>
+  <td>定义模型字段、子项模型等</td>
+</tr>
+<tr>
+  <td><code>templates/...</code></td>
+  <td>页面渲染模板 / 可复用 macro</td>
+</tr>
+</tbody>
+</table>
+<p>关键点：</p>
+<ul>
+<li><strong>折叠交互</strong>：直接用 HTML5 原生 <code>&lt;details&gt;</code> / <code>&lt;summary&gt;</code> 元素实现展开收起，<strong>无需任何 JS</strong>。</li>
+<li><strong>分类依据</strong>：模型新增可选字段 <code>category</code>，模板按该字段分组。</li>
+<li><strong>null 处理</strong>：<code>category</code> 为空的文章不进分组，独立渲染为平铺条目放在所有分组之后。</li>
+</ul>
+<h2 id="san-gai-dong-fang-an-yu-she-ji-wen-jian">三、改动方案与涉及文件</h2><h3 id="1-xin-zeng-category-ke-xuan-zi-duan">1. 新增 <code>category</code> 可选字段</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>models/section-page.ini</code></td>
+  <td>在 <code>[fields]</code> 中新增 <code>category</code>（<code>type = string</code>，可选；留空即未分类）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-ce-bian-lan-macro-an-fen-lei-fen-zu-zhe-die">2. 侧边栏 macro 按分类分组 + 折叠</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>templates/macros/section.html</code></td>
+  <td>重写 <code>render_sidebar</code>：按 <code>category</code> 分组渲染 <code>&lt;details&gt;</code>；当前页所在分组自动展开；无 <code>category</code> 的文章平铺在所有分组之后</td>
+</tr>
+</tbody>
+</table>
+<p>分组逻辑：</p>
+<ul>
+<li>有 <code>category</code> 的文章 → 归入对应 <code>&lt;details&gt;</code> 折叠分组。</li>
+<li>无 <code>category</code>（null/空）的文章 → 不分组，直接平铺渲染在分组之后。</li>
+<li>有 <code>category</code> 但为其子级的文章，优先用子级自己的 <code>category</code>，否则继承父级。</li>
+</ul>
+<h3 id="3-zhe-die-mian-ban-yang-shi">3. 折叠面板样式</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>webpack/scss/main.scss</code></td>
+  <td>在 <code>ul.tree-nav</code> 块内追加分组折叠样式（隐藏默认 marker、加 <code>▸</code> 箭头、缩进子列表等）</td>
+</tr>
+<tr>
+  <td><code>assets/static/styles.css</code></td>
+  <td>SCSS 编译产物（由 <code>npx webpack</code> 重新生成，改动 SCSS 后需重新构建）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-wei-xian-you-wen-zhang-tian-chong-category-shi-li">4. 为现有文章填充 <code>category</code>（示例）</h3><table>
+<thead>
+<tr>
+  <th>文件</th>
+  <th>category</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>content/program/conda/contents.lr</code></td>
+  <td><code>Python</code></td>
+</tr>
+<tr>
+  <td><code>content/program/hexo-cloud/contents.lr</code></td>
+  <td><code>博客</code></td>
+</tr>
+<tr>
+  <td><code>content/program/hexo-vercel-deploy/contents.lr</code></td>
+  <td><code>博客</code></td>
+</tr>
+<tr>
+  <td><code>content/program/hexo-bottom-quote-widget/contents.lr</code></td>
+  <td><code>博客</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>其余（<code>git-update</code>、<code>lektor</code>、<code>mlink</code>、<code>swiper-fix</code>）不写 <code>category</code>，将平铺显示在分组之后。</p>
+</blockquote>
+<h2 id="si-guan-jian-shi-xian-pian-duan">四、关键实现片段</h2><h3 id="ce-bian-lan-fen-zu-xuan-ran-he-xin">侧边栏分组渲染核心</h3><div class="hll"><pre><span></span><span class="c">{# 无 category 的文章进入 flat，其余进入 items #}</span>
+<span class="cp">{%</span> <span class="k">set</span> <span class="nv">ns</span> <span class="o">=</span> <span class="nv">namespace</span><span class="o">(</span><span class="nv">items</span><span class="o">=[],</span> <span class="nv">flat</span><span class="o">=[])</span> <span class="cp">%}</span>
+<span class="cp">{%</span> <span class="k">for</span> <span class="nv">child</span> <span class="k">in</span> <span class="nv">root.children</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">cat</span> <span class="o">=</span> <span class="nv">child.category</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">if</span> <span class="nv">cat</span> <span class="cp">%}</span>
+<span class="x">    </span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">ns.items</span> <span class="o">=</span> <span class="nv">ns.items</span> <span class="o">+</span> <span class="o">[(</span><span class="nv">child.title</span><span class="o">,</span> <span class="nv">child._path</span><span class="o">,</span> <span class="nv">cat</span><span class="o">)]</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">else</span> <span class="cp">%}</span>
+<span class="x">    </span><span class="cp">{%</span> <span class="k">set</span> <span class="nv">ns.flat</span> <span class="o">=</span> <span class="nv">ns.flat</span> <span class="o">+</span> <span class="o">[(</span><span class="nv">child.title</span><span class="o">,</span> <span class="nv">child._path</span><span class="o">,</span> <span class="s1">''</span><span class="o">)]</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">endif</span> <span class="cp">%}</span>
+<span class="x">  </span><span class="c">{# ...子级类似处理#}</span>
+<span class="cp">{%</span> <span class="k">endfor</span> <span class="cp">%}</span>
+
+<span class="c">{# 每个分类一个原生折叠组 #}</span>
+<span class="cp">{%</span> <span class="k">for</span> <span class="nv">cat</span> <span class="k">in</span> <span class="nv">cat_ns.order</span> <span class="cp">%}</span>
+<span class="x">  &lt;li class="tree-group"&gt;</span>
+<span class="x">    &lt;details</span><span class="cp">{%</span> <span class="k">if</span> <span class="nv">grp_ns.active</span> <span class="cp">%}</span><span class="x"> open</span><span class="cp">{%</span> <span class="k">endif</span> <span class="cp">%}</span><span class="x">&gt;</span>
+<span class="x">      &lt;summary class="tree-group-title"&gt;</span><span class="cp">{{</span> <span class="nv">cat</span> <span class="cp">}}</span><span class="x">&lt;/summary&gt;</span>
+<span class="x">      &lt;ul class="tree-group-items"&gt;</span>
+<span class="x">        </span><span class="c">{# ...该分类下的文章链接 #}</span>
+<span class="x">      &lt;/ul&gt;</span>
+<span class="x">    &lt;/details&gt;</span>
+<span class="x">  &lt;/li&gt;</span>
+<span class="cp">{%</span> <span class="k">endfor</span> <span class="cp">%}</span>
+
+<span class="c">{# 未分类文章平铺在最后 #}</span>
+<span class="cp">{%</span> <span class="k">for</span> <span class="nv">title</span><span class="o">,</span> <span class="nv">pth</span><span class="o">,</span> <span class="nv">c</span> <span class="k">in</span> <span class="nv">ns.flat</span> <span class="cp">%}</span>
+<span class="x">  &lt;li</span><span class="cp">{%</span> <span class="k">if</span> <span class="nv">page._path</span> <span class="o">==</span> <span class="nv">pth</span> <span class="cp">%}</span><span class="x"> class="active"</span><span class="cp">{%</span> <span class="k">endif</span> <span class="cp">%}</span><span class="x">&gt;&lt;a href="</span><span class="cp">{{</span> <span class="nv">pth</span><span class="o">|</span><span class="nf">url</span> <span class="cp">}}</span><span class="x">"&gt;</span><span class="cp">{{</span> <span class="nv">title</span> <span class="cp">}}</span><span class="x">&lt;/a&gt;&lt;/li&gt;</span>
+<span class="cp">{%</span> <span class="k">endfor</span> <span class="cp">%}</span>
+</pre></div>
+<h2 id="wu-xiao-guo-shi-yi">五、效果示意</h2><pre><code>📁 编程                                ← 根，始终可见
+  ▸ Python                             ← 折叠分组
+      Conda 环境管理
+  ▸ 博客
+      Hexo 博客部署到云服务器完整教程
+      Hexo 博客零成本部署到 Vercel 完整指南
+      页面底部添加语句
+  git-update                           ← 未分类，平铺显示
+  lektor
+  mlink
+  swiper-fix
+</code></pre>
+<h2 id="liu-shi-yong-shuo-ming">六、使用说明</h2><ul>
+<li><strong>给文章加分类</strong>：在 <code>content/program/&lt;目录&gt;/contents.lr</code> 里加一行 <code>category: 板块名</code>。</li>
+<li><strong>不加分类</strong>：不写 <code>category</code> 即可，文章会平铺显示在分组之后，不报错。</li>
+<li><strong>修改 SCSS 后</strong>：需重新执行 webpack 构建以更新 <code>assets/static/styles.css</code>，再刷新页面。</li>
+<li><strong>当前页定位</strong>：访问某篇文章时，其所属分组会自动展开。</li>
+</ul>
+
+</div>
+      </div>
+    </div>
+  </div>
+
+    
+  
+
+
+    
+    
+    
+    <div class="container">
+      <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+        
+        
+          <div class="nav-next">
+            <a href="../gallery-summary/">Next: Gallery 展示页面改动说明</a>
+          </div>
+        
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/jcw-2002/" title="JCW'S GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://music.163.com/#/user/home?id=1654208892/" title="我的网易云音乐"
+            ><i class="fa fa-music" aria-hidden="true"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/update/program-sidebar-categories/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../../../license/">License & Copyright</a> •
+          <a href="../../../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../static/styles.css?h=49e864fa">
+  <link rel="stylesheet" href="../../static/pygments.css">
+  <link rel="shortcut icon" href="../../static/favicon.png?h=fa09bedd">
+  <title>Git 更新仓库 | 欢迎来到我的博客</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../">W JC</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li class="active"><a href="../">18🈲</a></li>
+          
+            <li><a href="../../web/">Web</a></li>
+          
+            <li><a href="../../links/">友链</a></li>
+          
+            <li><a href="../../quotes/">语录</a></li>
+          
+            <li><a href="../../about/">关于我</a></li>
+          
+            <li><a href="../../update/">更新</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+    <div class="container">
+      
+  <div class="row">
+    <div class="col-sm-3">
+      
+  
+    
+  
+
+  
+  
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+
+  
+  
+  
+    
+      
+      
+    
+  
+    
+      
+      
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+
+  <ul class="tree-nav nocontent">
+    <li><a href="../">编程</a></li>
+
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+      <li class="tree-group">
+        <details>
+          <summary class="tree-group-title">Python</summary>
+          <ul class="tree-group-items">
+            
+              
+                <li><a href="../conda/">Conda 环境管理</a></li>
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+      <li class="tree-group">
+        <details>
+          <summary class="tree-group-title">博客</summary>
+          <ul class="tree-group-items">
+            
+              
+            
+              
+                <li><a href="../mlink/">Hexo AnZhiYu主题友链页面自定义数据源功能实现</a></li>
+              
+            
+              
+                <li><a href="../hexo-cloud/">Hexo 博客部署到云服务器完整教程</a></li>
+              
+            
+              
+                <li><a href="../hexo-vercel-deploy/">Hexo 博客零成本部署到 Vercel 完整指南</a></li>
+              
+            
+              
+                <li><a href="../swiper-fix/">解决安知鱼主题轮播图无法正常播放问题</a></li>
+              
+            
+              
+                <li><a href="../hexo-bottom-quote-widget/">页面底部添加语句</a></li>
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+
+    
+    
+      <li class="active"><a href="./">Git 更新仓库</a></li>
+    
+      <li><a href="../lektor/">lektor 操作</a></li>
+    
+  </ul>
+
+    </div>
+    <div class="col-sm-9 doc-styling">
+      <h1>Git 更新仓库</h1>
+      
+      <p>本指南将引导您完成 Git 版本控制中常见的更新和同步操作。</p>
+<h2 id="jian-cha-cang-ku-zhuang-tai">检查仓库状态</h2><p>在进行任何更新之前，最好先了解当前仓库的状态。</p>
+<div class="hll"><pre><span></span>git<span class="w"> </span>status
+</pre></div>
+<p>此命令会列出所有已修改（modified）、已暂存（staged）、未跟踪（untracked）或已删除（deleted）的文件。通过输出，您可以清楚地知道哪些文件发生了变化。</p>
+<h2 id="tian-jia-geng-gai">添加更改</h2><p>根据 <code>git status</code> 的输出，您可以选择要包含在下一次提交中的更改。</p>
+<h3 id="tian-jia-suo-you-yi-xiu-gai-he-yi-shan-chu-de-wen-jian">添加所有已修改和已删除的文件</h3><p>如果您想快速添加所有已跟踪文件中已修改和已删除的更改（不包括未跟踪的新文件），可以使用：</p>
+<div class="hll"><pre><span></span><span class="n">git</span> <span class="n">add</span> <span class="n">-u</span>
+</pre></div>
+<p>如果您想添加所有更改，包括新文件，可以使用 <code>git add .</code> 或 <code>git add -A</code>。</p>
+<h2 id="jian-cha-yuan-cheng-cang-ku-pei-zhi">检查远程仓库配置</h2><p>在推送代码之前，确保您的本地仓库已正确配置远程仓库地址。</p>
+<div class="hll"><pre><span></span>git<span class="w"> </span>remote<span class="w"> </span>-v
+</pre></div>
+<p>此命令会显示当前配置的远程仓库的名称（通常是 <code>origin</code>）及其 URL。您应该能看到 fetch 和 push 的地址。</p>
+<h2 id="jian-cha-he-pei-zhi-ssh-mi-yao">检查和配置 SSH 密钥</h2><p>使用 SSH 方式与 GitHub 等远程仓库交互更为安全和方便。</p>
+<h3 id="que-ren-ssh-mi-yao-shi-fou-cun-zai">确认 SSH 密钥是否存在</h3><p>运行以下命令查看您的 SSH 公钥文件：</p>
+<div class="hll"><pre><span></span><span class="nb">ls </span><span class="p">~/.</span><span class="n">ssh</span><span class="p">/</span><span class="n">id_</span><span class="p">*.</span><span class="n">pub</span>
+</pre></div>
+<p>如果输出类似 <code>C:/Users/你的用户名/.ssh/id_ed25519.pub</code> 或 <code>/Users/你的用户名/.ssh/id_rsa.pub</code>，说明密钥已存在。</p>
+<h3 id="sheng-cheng-xin-de-ssh-mi-yao">生成新的 SSH 密钥</h3><p>如果上述命令没有输出，或者您想生成新的密钥，可以使用以下命令（推荐使用 Ed25519 算法）：</p>
+<div class="hll"><pre><span></span><span class="n">ssh-keygen</span> <span class="n">-t</span> <span class="n">ed25519</span> <span class="n">-C</span> <span class="s2">"your_email@example.com"</span>
+</pre></div>
+<p>按照提示操作，您可以选择密钥的保存位置和设置密码（可选，但建议设置）。</p>
+<h3 id="jiang-gong-yao-tian-jia-dao-github">将公钥添加到 GitHub</h3><ol>
+<li><p><strong>复制公钥内容</strong>：
+使用以下命令显示并复制您的公钥内容：</p>
+<div class="hll"><pre><span></span><span class="nb">cat </span><span class="p">~/.</span><span class="n">ssh</span><span class="p">/</span><span class="n">id_ed25519</span><span class="p">.</span><span class="n">pub</span>
+</pre></div>
+<p>如果您的公钥是其他类型（如 <code>id_rsa.pub</code>），请相应修改文件名。</p>
+</li>
+<li><p><strong>添加到 GitHub</strong>：
+打开 GitHub 网站，进入您的账户设置（Settings），找到 &quot;SSH and GPG keys&quot; 页面。点击 &quot;New SSH key&quot; 或 &quot;Add SSH key&quot;，将复制的公钥内容粘贴到 &quot;Key&quot; 文本框中，给它一个标题（例如 &quot;My Laptop&quot;），然后点击 &quot;Add SSH key&quot;。</p>
+</li>
+</ol>
+<h2 id="ce-shi-ssh-lian-jie">测试 SSH 连接</h2><p>添加密钥后，测试一下与 GitHub 的 SSH 连接是否成功：</p>
+<div class="hll"><pre><span></span><span class="n">ssh</span> <span class="n">-T</span> <span class="n">git</span><span class="nv">@github</span><span class="p">.</span><span class="n">com</span>
+</pre></div>
+<p>如果看到类似 &quot;Hi your_username! You've successfully authenticated, but GitHub does not provide shell access.&quot; 的消息，说明 SSH 连接配置成功。</p>
+<h3 id="ssh-lian-jie-shi-bai-de-bei-xuan-fang-an-shi-yong-https">SSH 连接失败的备选方案：使用 HTTPS</h3><p>如果 SSH 连接遇到问题，或者您暂时不想配置 SSH，可以切换到 HTTPS 方式连接远程仓库：</p>
+<div class="hll"><pre><span></span>git<span class="w"> </span>remote<span class="w"> </span>set-url<span class="w"> </span>origin<span class="w"> </span>https://github.com/你的用户名/仓库名.git
+</pre></div>
+<p>请将 <code>你的用户名</code> 和 <code>仓库名</code>替换为您的实际 GitHub 用户名和仓库名称。</p>
+<h2 id="ti-jiao-bing-tui-song-geng-gai">提交并推送更改</h2><p>一旦您对更改满意并已正确配置远程仓库，就可以提交并推送它们了。</p>
+<h3 id="ti-jiao-geng-gai">提交更改</h3><div class="hll"><pre><span></span>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"你的更新说明"</span>
+</pre></div>
+<p>将 <code>&quot;你的更新说明&quot;</code> 替换为对本次提交内容的简明扼要的描述，例如 &quot;修复了用户登录bug&quot; 或 &quot;添加了新的数据验证功能&quot;。</p>
+<h3 id="tui-song-geng-gai-dao-yuan-cheng-cang-ku">推送更改到远程仓库</h3><div class="hll"><pre><span></span>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>master
+</pre></div>
+<p>或者，如果您的主分支名为 <code>main</code>（现在新建的仓库默认为 <code>main</code>），则使用：</p>
+<div class="hll"><pre><span></span>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>main
+</pre></div>
+<p>此命令会将您本地的 <code>master</code> (或 <code>main</code>) 分支的提交推送到名为 <code>origin</code> 的远程仓库。</p>
+<p>希望这篇指南能帮助您更好地使用 Git 进行代码的版本控制和更新！</p>
+
+    </div>
+  </div>
+
+    </div>
+    
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/jcw-2002/" title="JCW'S GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://music.163.com/#/user/home?id=1654208892/" title="我的网易云音乐"
+            ><i class="fa fa-music" aria-hidden="true"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/program/git-update/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../license/">License & Copyright</a> •
+          <a href="../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../../static/styles.css?h=49e864fa">
+  <link rel="stylesheet" href="../../static/pygments.css">
+  <link rel="shortcut icon" href="../../static/favicon.png?h=fa09bedd">
+  <title>Hexo 博客部署到云服务器完整教程 | 欢迎来到我的博客</title>
+</head>
+<body class="default">
+  <nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed"
+          data-toggle="collapse" data-target="#navbar"
+          aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../">W JC</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          
+            <li class="active"><a href="../">18🈲</a></li>
+          
+            <li><a href="../../web/">Web</a></li>
+          
+            <li><a href="../../links/">友链</a></li>
+          
+            <li><a href="../../quotes/">语录</a></li>
+          
+            <li><a href="../../about/">关于我</a></li>
+          
+            <li><a href="../../update/">更新</a></li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="body-wrapper">
+    
+    <div class="container">
+      
+  <div class="row">
+    <div class="col-sm-3">
+      
+  
+    
+  
+
+  
+  
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+    
+    
+      
+    
+    
+  
+
+  
+  
+  
+    
+      
+      
+    
+  
+    
+      
+      
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+
+  <ul class="tree-nav nocontent">
+    <li><a href="../">编程</a></li>
+
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+      <li class="tree-group">
+        <details>
+          <summary class="tree-group-title">Python</summary>
+          <ul class="tree-group-items">
+            
+              
+                <li><a href="../conda/">Conda 环境管理</a></li>
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+      
+      
+        
+      
+        
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+      <li class="tree-group">
+        <details open>
+          <summary class="tree-group-title">博客</summary>
+          <ul class="tree-group-items">
+            
+              
+            
+              
+                <li><a href="../mlink/">Hexo AnZhiYu主题友链页面自定义数据源功能实现</a></li>
+              
+            
+              
+                <li class="active"><a href="./">Hexo 博客部署到云服务器完整教程</a></li>
+              
+            
+              
+                <li><a href="../hexo-vercel-deploy/">Hexo 博客零成本部署到 Vercel 完整指南</a></li>
+              
+            
+              
+                <li><a href="../swiper-fix/">解决安知鱼主题轮播图无法正常播放问题</a></li>
+              
+            
+              
+                <li><a href="../hexo-bottom-quote-widget/">页面底部添加语句</a></li>
+              
+            
+          </ul>
+        </details>
+      </li>
+    
+
+    
+    
+      <li><a href="../git-update/">Git 更新仓库</a></li>
+    
+      <li><a href="../lektor/">lektor 操作</a></li>
+    
+  </ul>
+
+    </div>
+    <div class="col-sm-9 doc-styling">
+      <h1>Hexo 博客部署到云服务器完整教程</h1>
+      
+      <p>详细记录 Hexo 博客从本地开发环境到云服务器自动化部署的完整过程，包括环境配置、Git 钩子设置和 Nginx 服务器配置。</p>
+<h2 id="ji-zhu-fang-an-gai-shu">技术方案概述</h2><h3 id="wei-shi-yao-xuan-ze-hexo">为什么选择 Hexo</h3><p>目前搭建博客的主流框架有 <strong>WordPress</strong>、<strong>VuePress</strong>、<strong>Hugo</strong>、<strong>Hexo</strong> 等等，我主要是感觉 Hexo 好看的主题比较多，生态完善，所以选择了这个静态博客框架。</p>
+<h3 id="zheng-ti-bu-shu-jia-gou">整体部署架构</h3><p>采用 <strong>Git 钩子自动化部署</strong> 方案，实现一键部署：</p>
+<pre><code>graph LR
+    A[本地 Hexo] --&gt;|hexo deploy| B[远程 Git 仓库]
+    B --&gt;|Git 钩子触发| C[自动部署脚本]
+    C --&gt;|复制文件| D[Nginx 网站目录]
+    D --&gt;|访问| E[用户浏览器]
+</code></pre>
+<p><strong>核心流程</strong>：</p>
+<ol>
+<li>🏠 <strong>本地推送</strong>：执行 <code>hexo deploy</code> 将生成的静态文件推送到远程 Git 仓库</li>
+<li>🔄 <strong>自动触发</strong>：Git 仓库配置钩子脚本，接收推送后自动执行部署</li>
+<li>📂 <strong>文件同步</strong>：将最新的静态文件强制覆盖到 Nginx 指定的工作目录</li>
+<li>🌐 <strong>对外服务</strong>：Nginx 服务器配置访问根路径指向该工作目录</li>
+</ol>
+<h2 id="ben-di-huan-jing-zhun-bei">本地环境准备</h2><h3 id="ji-chu-huan-jing-an-zhuang">基础环境安装</h3><h4 id="1-node-js-he-git-huan-jing-yan-zheng">1. Node.js 和 Git 环境验证</h4><p>这两个工具是 Hexo 开发的基础依赖，确保已正确安装：</p>
+<div class="hll"><pre><span></span><span class="c1"># 验证 Node.js 安装</span>
+C:<span class="se">\U</span>sers<span class="se">\g</span>zl&gt;node<span class="w"> </span>-v
+v18.16.1
+
+<span class="c1"># 验证 Git 安装</span>
+C:<span class="se">\U</span>sers<span class="se">\g</span>zl&gt;git<span class="w"> </span>--version
+git<span class="w"> </span>version<span class="w"> </span><span class="m">2</span>.39.0.windows.2
+</pre></div>
+<p><strong>验证要点</strong>：</p>
+<ul>
+<li>✅ Node.js 版本建议 14.0 以上</li>
+<li>✅ Git 安装后右键菜单会出现 &quot;Git Bash Here&quot;</li>
+<li>✅ 确保 npm 命令可用</li>
+</ul>
+<h4 id="2-hexo-kuang-jia-an-zhuang-yu-chu-shi-hua">2. Hexo 框架安装与初始化</h4><p><strong>第一步：创建项目目录</strong></p>
+<div class="hll"><pre><span></span><span class="c1"># 新建博客存储目录</span>
+mkdir<span class="w"> </span>E:<span class="se">\M</span>yBlog
+<span class="nb">cd</span><span class="w"> </span>E:<span class="se">\M</span>yBlog
+</pre></div>
+<p><strong>第二步：安装 Hexo 脚手架</strong></p>
+<div class="hll"><pre><span></span><span class="c1"># 全局安装 Hexo 命令行工具</span>
+npm<span class="w"> </span>install<span class="w"> </span>-g<span class="w"> </span>hexo-cli
+</pre></div>
+<p><strong>第三步：初始化 Hexo 项目</strong></p>
+<div class="hll"><pre><span></span><span class="c1"># 创建新的 Hexo 项目</span>
+hexo<span class="w"> </span>init<span class="w"> </span>myblogs
+<span class="nb">cd</span><span class="w"> </span>myblogs
+
+<span class="c1"># 安装项目依赖</span>
+npm<span class="w"> </span>install
+</pre></div>
+<p><strong>项目结构说明</strong>：</p>
+<pre><code>myblogs/
+├── _config.yml          # 站点配置文件
+├── package.json         # 依赖管理文件
+├── scaffolds/           # 文章模板目录
+├── source/              # 源文件目录
+│   ├── _posts/          # 文章目录
+│   └── ...
+├── themes/              # 主题目录
+└── public/              # 生成的静态文件目录
+</code></pre>
+<p><strong>第四步：本地测试运行</strong></p>
+<div class="hll"><pre><span></span><span class="c1"># 启动本地服务器</span>
+hexo<span class="w"> </span>server
+
+<span class="c1"># 访问 http://localhost:4000/ 验证</span>
+</pre></div>
+<p>看到 Hexo 默认页面说明本地环境配置成功！ 🎉</p>
+<h3 id="bu-shu-cha-jian-an-zhuang">部署插件安装</h3><div class="hll"><pre><span></span><span class="c1"># 安装 Git 部署插件</span>
+npm<span class="w"> </span>install<span class="w"> </span>hexo-deployer-git<span class="w"> </span>--save
+
+<span class="c1"># 安装本地服务器插件</span>
+npm<span class="w"> </span>install<span class="w"> </span>hexo-server<span class="w"> </span>--save
+</pre></div>
+<h2 id="yun-fu-wu-qi-huan-jing-pei-zhi">云服务器环境配置</h2><h3 id="nginx-fu-wu-qi-pei-zhi">Nginx 服务器配置</h3><h4 id="1-an-zhuang-nginx">1. 安装 Nginx</h4><div class="hll"><pre><span></span><span class="c1"># CentOS/RHEL 系统</span>
+yum<span class="w"> </span>install<span class="w"> </span>nginx
+
+<span class="c1"># 验证安装</span>
+nginx<span class="w"> </span>-v
+</pre></div>
+<h4 id="2-chuang-jian-bu-shu-mu-lu">2. 创建部署目录</h4><div class="hll"><pre><span></span><span class="c1"># 创建 Hexo 部署目录</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>/data/hexo
+</pre></div>
+<h4 id="3-pei-zhi-nginx-zhu-pei-zhi-wen-jian">3. 配置 Nginx 主配置文件</h4><p>编辑 <code>/etc/nginx/nginx.conf</code>：</p>
+<div class="hll"><pre><span></span><span class="k">user</span><span class="w">  </span><span class="s">nginx</span><span class="p">;</span>
+<span class="k">worker_processes</span><span class="w">  </span><span class="s">auto</span><span class="p">;</span>
+
+<span class="k">error_log</span><span class="w">  </span><span class="s">/var/log/nginx/error.log</span><span class="w"> </span><span class="s">notice</span><span class="p">;</span>
+<span class="k">pid</span><span class="w">        </span><span class="s">/var/run/nginx.pid</span><span class="p">;</span>
+
+<span class="k">events</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">worker_connections</span><span class="w">  </span><span class="mi">1024</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">http</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">include</span><span class="w">       </span><span class="s">/etc/nginx/mime.types</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">default_type</span><span class="w">  </span><span class="s">application/octet-stream</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">log_format</span><span class="w">  </span><span class="s">main</span><span class="w">  </span><span class="s">'</span><span class="nv">$remote_addr</span><span class="w"> </span><span class="s">-</span><span class="w"> </span><span class="nv">$remote_user</span><span class="w"> </span><span class="s">[</span><span class="nv">$time_local]</span><span class="w"> </span><span class="s">"</span><span class="nv">$request"</span><span class="w"> </span><span class="s">'</span>
+<span class="w">                      </span><span class="s">'</span><span class="nv">$status</span><span class="w"> </span><span class="nv">$body_bytes_sent</span><span class="w"> </span><span class="s">"</span><span class="nv">$http_referer"</span><span class="w"> </span><span class="s">'</span>
+<span class="w">                      </span><span class="s">'"</span><span class="nv">$http_user_agent"</span><span class="w"> </span><span class="s">"</span><span class="nv">$http_x_forwarded_for"'</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">access_log</span><span class="w">  </span><span class="s">/var/log/nginx/access.log</span><span class="w">  </span><span class="s">main</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">sendfile</span><span class="w">        </span><span class="no">on</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">keepalive_timeout</span><span class="w">  </span><span class="mi">65</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">include</span><span class="w"> </span><span class="s">/etc/nginx/conf.d/*.conf</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<h4 id="4-pei-zhi-zhan-dian-xu-ni-zhu-ji">4. 配置站点虚拟主机</h4><p>编辑 <code>/etc/nginx/conf.d/default.conf</code>：</p>
+<p><strong>场景一：仅使用 IP 访问</strong></p>
+<div class="hll"><pre><span></span><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w">        </span><span class="mi">80</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w">   </span><span class="s">[::]:80</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">server_name</span><span class="w">  </span><span class="s">你的公网IP</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">root</span><span class="w">   </span><span class="s">/data/hexo</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">index</span><span class="w">  </span><span class="s">index.html</span><span class="w"> </span><span class="s">index.htm</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">error_page</span><span class="w">   </span><span class="mi">500</span><span class="w"> </span><span class="mi">502</span><span class="w"> </span><span class="mi">503</span><span class="w"> </span><span class="mi">504</span><span class="w">  </span><span class="s">/50x.html</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/50x.html</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">root</span><span class="w">   </span><span class="s">/usr/share/nginx/html</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+<p><strong>场景二：域名 + SSL 证书（推荐）</strong></p>
+<div class="hll"><pre><span></span><span class="c1"># HTTP 强制跳转 HTTPS</span>
+<span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w">        </span><span class="mi">80</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w">   </span><span class="s">[::]:80</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">server_name</span><span class="w">  </span><span class="s">你的域名</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">rewrite</span><span class="w"> </span><span class="s">^(.*)</span>$<span class="w"> </span><span class="s">https://</span><span class="nv">${server_name}$1</span><span class="w"> </span><span class="s">permanent</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1"># HTTPS 主站点配置</span>
+<span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w">  </span><span class="mi">443</span><span class="w"> </span><span class="s">ssl</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">server_name</span><span class="w">  </span><span class="s">你的域名</span><span class="p">;</span><span class="w"> </span>
+
+<span class="w">    </span><span class="kn">ssl_certificate</span><span class="w">   </span><span class="s">/path/to/your/cert.pem</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">ssl_certificate_key</span><span class="w">   </span><span class="s">/path/to/your/private.key</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">ssl_session_cache</span><span class="w">   </span><span class="s">shared:SSL:1m</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">ssl_session_timeout</span><span class="w">   </span><span class="mi">5m</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">ssl_ciphers</span><span class="w"> </span><span class="s">HIGH:!aNULL:!MD5</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">ssl_prefer_server_ciphers</span><span class="w">   </span><span class="no">on</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">proxy_set_header</span><span class="w">   </span><span class="s">X-Real-IP</span><span class="w">        </span><span class="nv">$remote_addr</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">proxy_set_header</span><span class="w">   </span><span class="s">Host</span><span class="w">             </span><span class="nv">$http_host</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">proxy_set_header</span><span class="w">   </span><span class="s">X-Forwarded-For</span><span class="w">  </span><span class="nv">$proxy_add_x_forwarded_for</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">root</span><span class="w">   </span><span class="s">/data/hexo</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">index</span><span class="w">  </span><span class="s">index.html</span><span class="w"> </span><span class="s">index.htm</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">error_page</span><span class="w">   </span><span class="mi">500</span><span class="w"> </span><span class="mi">502</span><span class="w"> </span><span class="mi">503</span><span class="w"> </span><span class="mi">504</span><span class="w">  </span><span class="s">/50x.html</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/50x.html</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">root</span><span class="w">   </span><span class="s">/usr/share/nginx/html</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+<h4 id="5-qi-dong-nginx-fu-wu">5. 启动 Nginx 服务</h4><div class="hll"><pre><span></span><span class="c1"># 启动 Nginx</span>
+nginx
+
+<span class="c1"># 重启 Nginx</span>
+nginx<span class="w"> </span>-s<span class="w"> </span>reload
+
+<span class="c1"># 停止 Nginx</span>
+nginx<span class="w"> </span>-s<span class="w"> </span>stop
+</pre></div>
+<h3 id="node-js-huan-jing-pei-zhi">Node.js 环境配置</h3><div class="hll"><pre><span></span><span class="c1"># 切换到根目录</span>
+<span class="nb">cd</span><span class="w"> </span>~
+
+<span class="c1"># 安装 Node.js</span>
+curl<span class="w"> </span>-sL<span class="w"> </span>https://rpm.nodesource.com/setup_16.x<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash<span class="w"> </span>-
+yum<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>nodejs
+
+<span class="c1"># 验证安装结果</span>
+node<span class="w"> </span>-v
+npm<span class="w"> </span>-v
+</pre></div>
+<h3 id="git-fu-wu-qi-pei-zhi">Git 服务器配置</h3><h4 id="1-an-zhuang-git">1. 安装 Git</h4><div class="hll"><pre><span></span><span class="c1"># 安装 Git</span>
+yum<span class="w"> </span>install<span class="w"> </span>git
+
+<span class="c1"># 验证版本</span>
+git<span class="w"> </span>--version
+</pre></div>
+<h4 id="2-chuang-jian-git-zhuan-yong-yong-hu">2. 创建 Git 专用用户</h4><div class="hll"><pre><span></span><span class="c1"># 创建 git 用户</span>
+adduser<span class="w"> </span>git
+
+<span class="c1"># 修改 sudoers 文件权限</span>
+chmod<span class="w"> </span><span class="m">740</span><span class="w"> </span>/etc/sudoers
+
+<span class="c1"># 编辑 sudoers 文件</span>
+vim<span class="w"> </span>/etc/sudoers
+</pre></div>
+<p>在 <code>root ALL=(ALL) ALL</code> 下方添加：</p>
+<pre><code>git ALL=(ALL) ALL
+</code></pre>
+<div class="hll"><pre><span></span><span class="c1"># 恢复 sudoers 文件权限</span>
+chmod<span class="w"> </span><span class="m">400</span><span class="w"> </span>/etc/sudoers
+
+<span class="c1"># 设置 git 用户密码</span>
+sudo<span class="w"> </span>passwd<span class="w"> </span>git
+</pre></div>
+<h4 id="3-ssh-mian-mi-deng-lu-pei-zhi">3. SSH 免密登录配置</h4><p><strong>服务器端操作</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 切换到 git 用户</span>
+su<span class="w"> </span>git
+
+<span class="c1"># 创建 SSH 目录</span>
+<span class="nb">cd</span><span class="w"> </span>~
+mkdir<span class="w"> </span>.ssh
+</pre></div>
+<p><strong>本地端操作</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 生成 SSH 密钥对</span>
+<span class="nb">cd</span><span class="w"> </span>~/.ssh
+ssh-keygen
+
+<span class="c1"># 设置私钥权限</span>
+chmod<span class="w"> </span><span class="m">700</span><span class="w"> </span>~/.ssh
+chmod<span class="w"> </span><span class="m">600</span><span class="w"> </span>~/.ssh/id_rsa<span class="w"> </span>
+</pre></div>
+<p><strong>上传公钥到服务器</strong>：</p>
+<p>将本地的 <code>id_rsa.pub</code> 文件上传到服务器的 <code>/home/git/.ssh/</code> 目录</p>
+<p><strong>服务器端配置</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 切换到 git 用户</span>
+su<span class="w"> </span>git
+<span class="nb">cd</span><span class="w"> </span>~/.ssh
+
+<span class="c1"># 设置公钥文件</span>
+cp<span class="w"> </span>id_rsa.pub<span class="w"> </span>authorized_keys
+cat<span class="w"> </span>id_rsa.pub<span class="w"> </span>&gt;&gt;<span class="w"> </span>authorized_keys
+
+<span class="c1"># 设置正确权限</span>
+chmod<span class="w"> </span><span class="m">600</span><span class="w"> </span>authorized_keys
+chmod<span class="w"> </span><span class="m">700</span><span class="w"> </span>~/.ssh
+
+<span class="c1"># 设置 SELinux 标签（如果启用了 SELinux）</span>
+restorecon<span class="w"> </span>-Rv<span class="w"> </span>~/.ssh<span class="w"> </span>
+</pre></div>
+<p><strong>测试免密登录</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 本地测试连接</span>
+ssh<span class="w"> </span>-v<span class="w"> </span>git@你的服务器IP
+</pre></div>
+<p>看到成功连接说明 SSH 配置正确！ ✅</p>
+<h4 id="4-chuang-jian-git-luo-cang-ku">4. 创建 Git 裸仓库</h4><div class="hll"><pre><span></span><span class="c1"># 切换到 git 用户</span>
+su<span class="w"> </span>git
+<span class="nb">cd</span><span class="w"> </span>~
+
+<span class="c1"># 创建裸仓库</span>
+git<span class="w"> </span>init<span class="w"> </span>--bare<span class="w"> </span>hexo.git
+
+<span class="c1"># 创建 Git 钩子脚本</span>
+vim<span class="w"> </span>~/hexo.git/hooks/post-receive
+</pre></div>
+<p><strong>钩子脚本内容</strong>：</p>
+<div class="hll"><pre><span></span><span class="ch">#!/bin/bash</span>
+git<span class="w"> </span>--work-tree<span class="o">=</span>/data/hexo<span class="w"> </span>--git-dir<span class="o">=</span>/home/git/hexo.git<span class="w"> </span>checkout<span class="w"> </span>-f
+</pre></div>
+<p><strong>设置钩子权限</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 给钩子脚本执行权限</span>
+chmod<span class="w"> </span>+x<span class="w"> </span>~/hexo.git/hooks/post-receive
+
+<span class="c1"># 设置部署目录权限</span>
+sudo<span class="w"> </span>chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">777</span><span class="w"> </span>/data/hexo
+</pre></div>
+<h2 id="ben-di-xiang-mu-pei-zhi-yu-bu-shu">本地项目配置与部署</h2><h3 id="pei-zhi-bu-shu-can-shu">配置部署参数</h3><p>编辑本地 Hexo 项目的 <code>_config.yml</code> 文件：</p>
+<div class="hll"><pre><span></span><span class="c1"># 部署配置</span>
+<span class="nt">deploy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">git</span>
+<span class="w">  </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">git@你的服务器IP:/home/git/hexo.git</span>
+<span class="w">  </span><span class="nt">branch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">master</span>
+</pre></div>
+<h3 id="pei-zhi-git-quan-ju-bian-liang">配置 Git 全局变量</h3><div class="hll"><pre><span></span><span class="c1"># 设置 Git 用户信息</span>
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>user.email<span class="w"> </span><span class="s2">"your-email@example.com"</span>
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>user.name<span class="w"> </span><span class="s2">"your-name"</span>
+</pre></div>
+<h3 id="zhi-xing-bu-shu-ming-ling">执行部署命令</h3><div class="hll"><pre><span></span><span class="c1"># 清除缓存</span>
+hexo<span class="w"> </span>clean
+
+<span class="c1"># 生成静态文件</span>
+hexo<span class="w"> </span>generate
+
+<span class="c1"># 部署到服务器</span>
+hexo<span class="w"> </span>deploy
+</pre></div>
+<h2 id="bu-shu-liu-cheng-xiang-jie">部署流程详解</h2><h3 id="wan-zheng-bu-shu-liu-cheng">完整部署流程</h3><div class="hll"><pre><span></span><span class="c1"># 1. 清理之前的生成文件</span>
+hexo<span class="w"> </span>clean
+
+<span class="c1"># 2. 生成新的静态文件</span>
+hexo<span class="w"> </span>g<span class="w">  </span><span class="c1"># hexo generate 的简写</span>
+
+<span class="c1"># 3. 部署到远程服务器</span>
+hexo<span class="w"> </span>d<span class="w">  </span><span class="c1"># hexo deploy 的简写</span>
+</pre></div>
+<h3 id="git-gou-zi-gong-zuo-yuan-li">Git 钩子工作原理</h3><p>当执行 <code>hexo deploy</code> 时：</p>
+<ol>
+<li><strong>本地推送</strong>：Hexo 将 <code>public/</code> 目录中的静态文件推送到服务器的 Git 仓库</li>
+<li><strong>钩子触发</strong>：服务器接收到推送后，自动执行 <code>post-receive</code> 钩子</li>
+<li><strong>文件部署</strong>：钩子脚本将文件检出到 <code>/data/hexo</code> 目录</li>
+<li><strong>服务生效</strong>：Nginx 立即提供新的静态文件服务</li>
+</ol>
+<h3 id="bu-shu-cheng-gong-yan-zheng">部署成功验证</h3><p>访问你的域名或服务器 IP，看到 Hexo 博客页面说明部署成功！ 🎊</p>
+<h2 id="chang-jian-wen-ti-yu-jie-jue-fang-an">常见问题与解决方案</h2><h3 id="1-ssh-lian-jie-shi-bai">1. SSH 连接失败</h3><p><strong>问题现象</strong>：</p>
+<div class="hll"><pre><span></span>ssh:<span class="w"> </span>connect<span class="w"> </span>to<span class="w"> </span>host<span class="w"> </span>xxx.xxx.xxx.xxx<span class="w"> </span>port<span class="w"> </span><span class="m">22</span>:<span class="w"> </span>Connection<span class="w"> </span>refused
+</pre></div>
+<p><strong>解决方案</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 检查 SSH 服务状态</span>
+systemctl<span class="w"> </span>status<span class="w"> </span>sshd
+
+<span class="c1"># 启动 SSH 服务</span>
+systemctl<span class="w"> </span>start<span class="w"> </span>sshd
+
+<span class="c1"># 检查防火墙设置</span>
+firewall-cmd<span class="w"> </span>--list-all
+</pre></div>
+<h3 id="2-git-gou-zi-wu-zhi-xing-quan-xian">2. Git 钩子无执行权限</h3><p><strong>问题现象</strong>：部署时没有错误，但文件未更新</p>
+<p><strong>解决方案</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 检查钩子文件权限</span>
+ls<span class="w"> </span>-la<span class="w"> </span>~/hexo.git/hooks/post-receive
+
+<span class="c1"># 添加执行权限</span>
+chmod<span class="w"> </span>+x<span class="w"> </span>~/hexo.git/hooks/post-receive
+</pre></div>
+<h3 id="3-nginx-403-quan-xian-cuo-wu">3. Nginx 403 权限错误</h3><p><strong>问题现象</strong>：访问网站出现 403 Forbidden</p>
+<p><strong>解决方案</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 检查目录权限</span>
+ls<span class="w"> </span>-la<span class="w"> </span>/data/
+
+<span class="c1"># 设置正确权限</span>
+sudo<span class="w"> </span>chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">755</span><span class="w"> </span>/data/hexo
+
+<span class="c1"># 检查 SELinux 状态</span>
+getenforce
+
+<span class="c1"># 临时关闭 SELinux（如果需要）</span>
+setenforce<span class="w"> </span><span class="m">0</span>
+</pre></div>
+<h3 id="4-duan-kou-bei-zhan-yong">4. 端口被占用</h3><p><strong>问题现象</strong>：Nginx 启动失败，端口 80/443 被占用</p>
+<p><strong>解决方案</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 查看端口占用</span>
+netstat<span class="w"> </span>-tulnp<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>:80
+
+<span class="c1"># 杀死占用进程</span>
+<span class="nb">kill</span><span class="w"> </span>-9<span class="w"> </span>进程ID
+
+<span class="c1"># 或修改 Nginx 监听端口</span>
+vim<span class="w"> </span>/etc/nginx/conf.d/default.conf
+</pre></div>
+<h2 id="gao-ji-you-hua-jian-yi">高级优化建议</h2><h3 id="1-zi-dong-hua-jiao-ben-you-hua">1. 自动化脚本优化</h3><p>创建更智能的部署钩子 <code>/home/git/hexo.git/hooks/post-receive</code>：</p>
+<div class="hll"><pre><span></span><span class="ch">#!/bin/bash</span>
+
+<span class="c1"># 设置变量</span>
+<span class="nv">WORK_TREE</span><span class="o">=</span><span class="s2">"/data/hexo"</span>
+<span class="nv">GIT_DIR</span><span class="o">=</span><span class="s2">"/home/git/hexo.git"</span>
+
+<span class="c1"># 记录部署开始时间</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"开始部署: </span><span class="k">$(</span>date<span class="k">)</span><span class="s2">"</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/var/log/hexo-deploy.log
+
+<span class="c1"># 检出文件到工作目录</span>
+git<span class="w"> </span>--work-tree<span class="o">=</span><span class="nv">$WORK_TREE</span><span class="w"> </span>--git-dir<span class="o">=</span><span class="nv">$GIT_DIR</span><span class="w"> </span>checkout<span class="w"> </span>-f
+
+<span class="c1"># 设置正确的文件权限</span>
+chown<span class="w"> </span>-R<span class="w"> </span>nginx:nginx<span class="w"> </span><span class="nv">$WORK_TREE</span>
+chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">755</span><span class="w"> </span><span class="nv">$WORK_TREE</span>
+
+<span class="c1"># 重载 Nginx 配置</span>
+nginx<span class="w"> </span>-s<span class="w"> </span>reload
+
+<span class="c1"># 记录部署完成</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"部署完成: </span><span class="k">$(</span>date<span class="k">)</span><span class="s2">"</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/var/log/hexo-deploy.log
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"----------------------------------------"</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/var/log/hexo-deploy.log
+</pre></div>
+<h3 id="2-bei-fen-ce-lue">2. 备份策略</h3><div class="hll"><pre><span></span><span class="c1"># 创建自动备份脚本</span>
+vim<span class="w"> </span>/home/git/backup-hexo.sh
+</pre></div>
+<div class="hll"><pre><span></span><span class="ch">#!/bin/bash</span>
+<span class="nv">BACKUP_DIR</span><span class="o">=</span><span class="s2">"/backup/hexo"</span>
+<span class="nv">DATE</span><span class="o">=</span><span class="k">$(</span>date<span class="w"> </span>+%Y%m%d_%H%M%S<span class="k">)</span>
+
+mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$BACKUP_DIR</span>
+tar<span class="w"> </span>-czf<span class="w"> </span><span class="nv">$BACKUP_DIR</span>/hexo_backup_<span class="nv">$DATE</span>.tar.gz<span class="w"> </span>/data/hexo
+
+<span class="c1"># 保留最近7天的备份</span>
+find<span class="w"> </span><span class="nv">$BACKUP_DIR</span><span class="w"> </span>-name<span class="w"> </span><span class="s2">"hexo_backup_*.tar.gz"</span><span class="w"> </span>-mtime<span class="w"> </span>+7<span class="w"> </span>-delete
+</pre></div>
+<h3 id="3-jian-kong-yu-ri-zhi">3. 监控与日志</h3><div class="hll"><pre><span></span><span class="c1"># 设置 Nginx 访问日志分析</span>
+tail<span class="w"> </span>-f<span class="w"> </span>/var/log/nginx/access.log
+
+<span class="c1"># 监控部署日志</span>
+tail<span class="w"> </span>-f<span class="w"> </span>/var/log/hexo-deploy.log
+
+<span class="c1"># 实时监控文件变化</span>
+watch<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="s1">'ls -la /data/hexo'</span>
+</pre></div>
+<h3 id="4-xing-neng-you-hua">4. 性能优化</h3><p><strong>Nginx 性能调优</strong>：</p>
+<div class="hll"><pre><span></span><span class="c1"># 在 http 块中添加</span>
+<span class="k">gzip</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+<span class="k">gzip_vary</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+<span class="k">gzip_min_length</span><span class="w"> </span><span class="mi">1024</span><span class="p">;</span>
+<span class="k">gzip_types</span><span class="w"> </span><span class="s">text/plain</span><span class="w"> </span><span class="s">text/css</span><span class="w"> </span><span class="s">text/xml</span><span class="w"> </span><span class="s">text/javascript</span><span class="w"> </span><span class="s">application/javascript</span><span class="w"> </span><span class="s">application/xml+rss</span><span class="w"> </span><span class="s">application/json</span><span class="p">;</span>
+
+<span class="c1"># 静态文件缓存</span>
+<span class="k">location</span><span class="w"> </span><span class="p">~</span><span class="sr">*</span><span class="w"> </span><span class="s">\.(jpg|jpeg|png|gif|ico|css|js)</span>$<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">expires</span><span class="w"> </span><span class="s">1y</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">Cache-Control</span><span class="w"> </span><span class="s">"public,</span><span class="w"> </span><span class="s">immutable"</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<h2 id="zong-jie">总结</h2><p>通过本教程，我们成功实现了 Hexo 博客的自动化云服务器部署方案。这个方案的核心优势包括：</p>
+<h3 id="ji-zhu-te-dian">技术特点</h3><ol>
+<li><strong>自动化程度高</strong>：一次配置，终身受益</li>
+<li><strong>部署速度快</strong>：Git 钩子秒级部署</li>
+<li><strong>稳定性强</strong>：基于成熟的 Git + Nginx 技术栈</li>
+<li><strong>扩展性好</strong>：可轻松添加多环境部署支持</li>
+</ol>
+<h3 id="guan-jian-shou-yi">关键收益</h3><ul>
+<li>🚀 <strong>开发效率提升</strong>：本地写作，一键部署</li>
+<li>🔒 <strong>安全性保障</strong>：SSH 免密 + Git 版本控制</li>
+<li>📈 <strong>性能优化</strong>：静态文件 + Nginx 高性能服务</li>
+<li>🛠️ <strong>运维简化</strong>：自动化部署减少人工干预</li>
+</ul>
+<p>这套方案不仅解决了 Hexo 博客的部署问题，还为后续的博客运维和扩展奠定了坚实的基础。无论是个人博客还是团队文档站点，都可以基于这个方案进行定制和优化。</p>
+
+    </div>
+  </div>
+
+    </div>
+    
+  </div>
+
+  
+  <div class="bottomsummary">
+    <div class="container">
+    </div>
+  </div>
+  
+
+  
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-4 icon-bar">
+          <a href="https://github.com/jcw-2002/" title="JCW'S GitHub"
+            ><i class="fa fa-github"></i></a>
+          <a href="https://music.163.com/#/user/home?id=1654208892/" title="我的网易云音乐"
+            ><i class="fa fa-music" aria-hidden="true"></i></a>
+          <a href="https://github.com/lektor/lektor/issues/" title="Report Issues for Lektor"
+            ><i class="fa fa-bug"></i></a>
+          <a href="https://twitter.com/getlektor" title="Find Lektor on Twitter"
+            ><i class="fa fa-twitter"></i></a>
+          <a href="https://gitter.im/lektor/lektor" title="Chat on Gitter"
+            ><i class="fa fa-comment"></i></a>
+          <a href="https://github.com/lektor/lektor-website/tree/master/content/program/hexo-cloud/contents.lr" title="View source for this page"><i class="fa fa-code"></i></a>
+        </div>
+        <div class="col-sm-8">
+          <a href="../../license/">License & Copyright</a> •
+          <a href="../../contact/">Contact</a> •
+          Made with <i class="fa fa-fw fa-heart" title="Heart"><span hidden>Heart</span></i> in Carinthia
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+
+  <script type=text/javascript src="../../static/app.js?h=6221bb56" charset="utf-8"></script>
+  <script>
+    ((window.gitter = {}).chat = {}).options = {
+      room: 'lektor/lektor',
+      activationElement: null
+    };
+    document.write('<button class="js-gitter-toggle-chat-button">Toggle Chat</button>');
+    var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    if (dnt != "1" && dnt != "yes") {
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-70822533-1', 'auto');
+      ga('set', 'anonymizeIp', true);
+      ga('send', 'pageview');
+    } else {
+      console.debug("Respecting Do-Not-Track, not running analytics.");
+    }
+  </script>
+  <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+  <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
+  <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+</body>
+</html>
