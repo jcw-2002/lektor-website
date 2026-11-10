@@ -1,0 +1,114 @@
+title: Live2D 看板娘（大肥鱼）更新简介
+---
+summary: 站点新增可拖拽的大肥鱼 Live2D 看板娘，并把配置、菜单与交互收敛到 assets/live2d/widget.js；记录菜单定制、拖拽同步、画布裁剪和状态条对齐等问题的排查与修复。
+---
+pub_date: 2026-11-10
+---
+author: jcw
+---
+body:
+
+#### text-block ####
+text:
+
+> 项目路径：`f:\program\blog\lektor-website`
+> 另有一个独立运行的 Lektor 站点 `f:\program\blog\jcw`，两者静态资源不共享，组件脚本需保持同步。
+
+## 一、本次更新内容
+
+站点加入了基于 `oh-my-live2d` 的大肥鱼（Cubism 4 / `model3.json`）看板娘，并完成下列定制：
+
+1. **右侧菜单**：隐藏「换套装」「换形象」（当前只有一个模型），新增「聊天」按钮占位，「关于」改为指向模型项目 `https://github.com/xkk6663/dsh-live2d-mao`。
+2. **随意拖拽**：按住模型画布或状态条即可拖动，双击复位，位置存 `localStorage`，刷新后保持。
+3. **代码收敛**：CDN 加载、模型配置、气泡文案、菜单、拖拽全部放进 `assets/live2d/widget.js`，`templates/layout.html` 只剩一行引用。
+4. **显示问题修复**：位移不同步、右侧被裁、状态条与按钮高度错位、「加载成功」提示不消失。
+
+## 二、排查过程与根因
+
+### 1. 初次加载看不到形象
+
+脚本写在 `jcw/templates/layout.html`，模型却放在 `lektor-website/assets/live2d/dafeiyu`，这是两个互相独立的 Lektor 项目，资源不互通，模型请求必然 404；同时 `build/` 是旧构建，既没有脚本也没有 `live2d/` 输出目录。把模型同步到 `jcw/assets/live2d/dafeiyu` 并在两个模板里都接入后恢复。
+
+### 2. 模型右侧被截断
+
+`stageStyle` 显式写死 `{ width: 320, height: 450 }`，而组件文档说明「舞台内 Canvas 宽高始终与舞台一致」；`scale: 0.12` 又比库默认 `0.1` 大，模型超出 Canvas 视口的部分不会被绘制。组件 CSS 里唯一的 `overflow: hidden` 只作用于提示框文字，舞台本身没有额外裁剪——限制来自 Canvas 视口边界。把 `scale` 调到 `0.08` 后形象完整显示。
+
+### 3. 拖动距离不同步
+
+最初给 `#oml2d-stage`、`#oml2d-menus`、`#oml2d-statusBar`、`#oml2d-tips` 逐个设置 `translate`。但组件源码里 `menus.reload(this.stage.element)`、`tips.reload(this.stage.element)` 表明菜单与提示框挂在**舞台内部**，于是它们被「舞台位移 + 自身位移」叠加，走了两倍距离；状态条独立挂载，只走一倍，越拖越散。
+
+### 4. 状态条与按钮高度错位
+
+状态条默认 `position: fixed; bottom: 80px`（相对整个视口），菜单默认 `position: absolute; bottom: 10%`（相对 450px 高的舞台），基准不同；模型缩小后集中到画布上半部，UI 仍贴在下方，错位更明显。
+
+### 5.「加载成功」不消失
+
+组件内部 `hideLoading() → popup(文案, 1000)`，再加 `transitionTime: 800`，约 1.8 秒靠 CSS 动画滑出，且**没有可配置的显示时长**；动画未生效时提示会一直挂着。
+
+## 三、实现方案
+
+### 统一容器（解决位移同步）
+
+用组件官方的 `parentElement` 选项，把舞台、状态条（以及挂在舞台内的菜单、提示框、加载态）收进同一个 `#oml2d-wrapper`，拖动时只改容器的 `transform`：
+
+```js
+var wrapper = document.createElement('div');
+wrapper.id = 'oml2d-wrapper';
+wrapper.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;'
+                      + 'pointer-events:none;z-index:9999;';
+document.body.appendChild(wrapper);
+
+var options = {
+  parentElement: wrapper,
+  models: [{ path: MODEL, scale: 0.08, position: [-10, 10],
+             stageStyle: { width: 320, height: 450 } }],
+  // ...
+};
+```
+
+容器自身 `pointer-events: none`，再用一条 CSS `#oml2d-wrapper > * { pointer-events: auto; }` 放行子元素，保证按钮和模型仍可点击。
+
+### 模板只留一行
+
+```html
+<script src="{{ '/live2d/widget.js'|asseturl }}"
+        data-model="{{ '/live2d/dafeiyu/c_0120.model3.json'|asseturl }}"></script>
+```
+
+模型路径由 Lektor 的 `asseturl` 生成并经 `data-model` 传入，不写死；CDN 从 `@latest` 钉到 `@0.19.3`，避免上游升级导致配置失效。
+
+### 菜单与状态条
+
+`menus.items` 用函数 `(defaultItems) => [...]` 拿默认项再 `filter` / `map` / `concat`；聊天按钮的图标通过页面内注册的 `<symbol id="oml2d-icon-chat">` 提供。两者位置统一成：
+
+```js
+statusBar: { style: { bottom: '150px' } },
+menus: { style: { bottom: '150px' }, items: /* ... */ }
+```
+
+「加载成功」用 `MutationObserver` 监听状态条文本，出现该文案后 3 秒隐藏；换成「看板娘休息中」等其它文案时自动恢复，不影响休息功能。
+
+## 四、涉及文件
+
+| 文件 | 改动 |
+|------|------|
+| `assets/live2d/dafeiyu/` | 新增模型资源（`model3.json`、`moc3`、贴图、动作等，63 个文件 / 约 4.2 MB） |
+| `assets/live2d/widget.js` | 新增：组件配置、菜单、拖拽、自动隐藏的完整实现 |
+| `templates/layout.html` | 删除所有内联 Live2D 代码，改为一行引用 |
+| `jcw/assets/live2d/dafeiyu/`、`jcw/assets/live2d/widget.js` | 同步一份，让另一个站点同样可用 |
+| `pyproject.toml` | 移除 uv 不支持的 `exclude-newer = "7 days"`，消除解析告警 |
+
+## 五、使用与可调参数
+
+- **大小 / 裁剪**：`widget.js` 里的 `scale`（当前 `0.08`）与 `stageStyle.width/height`。
+- **UI 高度**：`statusBar.style.bottom` 与 `menus.style.bottom`（当前同为 `150px`，数值越大越靠上）。
+- **菜单**：`menus.items`；「关于」链接在 `About` 的 `onClick` 里。
+- **复位**：双击模型，或清掉 `localStorage` 的 `oml2d-drag-offset`。
+- **同步两个站点**：改完一份后执行 `Copy-Item 'f:\program\blog\lektor-website\assets\live2d\widget.js' 'f:\program\blog\jcw\assets\live2d\widget.js' -Force`。
+- **发布静态站点**：旧的 `build/` 需重新 `lektor build`，才会包含 `live2d/widget.js` 与模型资源。
+
+## 六、遗留 / 待办
+
+- 「聊天」按钮目前只是占位，`onClick` 为空，未接入对话功能。
+- 两个独立站点各有一份 `widget.js`，需手动同步（可考虑合并成共享目录）。
+- CDN 已固定为 `0.19.3`，后续升级需重新验证 `menus`、`parentElement` 等配置。
