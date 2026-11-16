@@ -101,8 +101,9 @@
   <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
   <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
 
-  <!-- Live2D 看板娘：实现见 assets/live2d/widget.js -->
+  <!-- Live2D 看板娘：实现见 assets/live2d/widget.js（聊天面板/样式/逻辑均已内置） -->
   <script src="{{ '/live2d/widget.js'|asseturl }}"
-          data-model="{{ '/live2d/dafeiyu/c_0120.model3.json'|asseturl }}"></script>
+          data-model="{{ '/live2d/dafeiyu/c_0120.model3.json'|asseturl }}"
+          data-chat-api="https://wanjc.top/api/chat"></script>
 </body>
 </html>
