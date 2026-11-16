@@ -1,5 +1,5 @@
 /*
- * 大肥鱼 Live2D 组件：CDN、模型配置、菜单、拖拽、AI 聊天全部集中在这里。
+ * 大肥鱼 Live2D 组件：库加载、模型配置、菜单、拖拽、AI 聊天全部集中在这里。
  * 模板里只需一行引用（见 templates/layout.html 末尾）。
  */
 (function () {
@@ -10,7 +10,11 @@
               '/live2d/dafeiyu/c_0120.model3.json';
   // SSE 接口地址：可用 <script data-chat-api="..."> 覆盖，默认走同源 /api/chat
   var CHAT_API = (current && current.getAttribute('data-chat-api')) || '/api/chat';
-  var CDN = 'https://fastly.jsdelivr.net/npm/oh-my-live2d@0.19.3/dist/index.min.js';
+  // oh-my-live2d 加载源：优先本地托管（已随 assets 部署），失败再回退 CDN
+  var OML2D_SOURCES = [
+    '/live2d/oml2d.min.js',
+    'https://unpkg.com/oh-my-live2d@0.19.3/dist/index.min.js'
+  ];
   var STORE_KEY = 'oml2d-drag-offset';
 
   /* 1) 统一容器：舞台、状态条、菜单、提示框都在里面，只拖这一个元素 */
@@ -26,58 +30,50 @@
     '#oml2d-stage { touch-action:none !important; cursor:grab !important; }',
     '#oml2d-wrapper.is-dragging #oml2d-stage { cursor:grabbing !important; }',
 
-    /* ===== 小鲸鱼聊天面板（与模型同属 wrapper，拖拽时一起移动） ===== */
-    '#oml2d-chat-launcher { position:absolute; right:348px; bottom:150px; padding:7px 13px;',
-    '  border:0; border-radius:999px; background:linear-gradient(135deg,#7fd8ff,#a5b4fc);',
-    '  color:#fff; font-family:inherit; font-size:12px; font-weight:600; letter-spacing:.5px;',
-    '  box-shadow:0 4px 14px rgba(80,150,220,.35); cursor:pointer; user-select:none;',
-    '  white-space:nowrap; transition:transform .18s,box-shadow .18s; }',
-    '#oml2d-chat-launcher:hover { transform:translateY(-2px); box-shadow:0 7px 18px rgba(80,150,220,.45); }',
-    '#oml2d-chat { position:absolute; right:348px; bottom:150px; width:320px; height:420px;',
-    '  display:none; flex-direction:column; overflow:hidden; border-radius:18px;',
-    '  background:rgba(255,255,255,.96); border:1px solid rgba(120,190,230,.45);',
-    '  box-shadow:0 12px 40px rgba(40,90,150,.22);',
-    '  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; color:#334155; }',
-    '#oml2d-chat.is-open { display:flex; animation:oml2d-chat-in .22s ease-out; }',
-    '@keyframes oml2d-chat-in { from { opacity:0; transform:translateY(10px) scale(.97); }',
-    '  to { opacity:1; transform:none; } }',
-    '#oml2d-chat-head { display:flex; align-items:center; gap:6px; padding:10px 12px;',
-    '  background:linear-gradient(135deg,#e0f7ff,#eef2ff); border-bottom:1px solid #d8eaf5;',
-    '  font-weight:700; color:#0f6f9c; }',
-    '#oml2d-chat-head .oml2d-chat-sub { margin-left:auto; font-size:11px; font-weight:400; color:#7aa5bd; }',
-    '#oml2d-chat-close { border:0; background:transparent; color:#5b8ca8; cursor:pointer;',
-    '  font-size:17px; line-height:1; padding:2px 6px; border-radius:8px; }',
-    '#oml2d-chat-close:hover { background:rgba(255,255,255,.7); }',
+    /* ===== 大肥鱼聊天面板：单色极简，挂在 body 上，可单独拖动 ===== */
+    '#oml2d-chat { position:fixed; left:0; top:0; width:320px; height:420px;',
+    '  display:none; flex-direction:column; overflow:hidden; border-radius:8px;',
+    '  background:#fff; border:1px solid #e6e6e6; z-index:10000;',
+    '  box-shadow:0 4px 14px rgba(0,0,0,.07);',
+    '  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; color:#333; }',
+    '#oml2d-chat.is-open { display:flex; }',
+    '#oml2d-chat-head { display:flex; align-items:center; gap:8px; padding:10px 12px;',
+    '  background:#fafafa; border-bottom:1px solid #eee; color:#1f1f1f;',
+    '  cursor:grab; user-select:none; touch-action:none; }',
+    '#oml2d-chat.is-dragging #oml2d-chat-head { cursor:grabbing; }',
+    '.oml2d-chat-avatar { font-size:16px; line-height:1; }',
+    '.oml2d-chat-title { font-size:13px; font-weight:600; }',
+    '#oml2d-chat-close { margin-left:auto; border:0; background:transparent;',
+    '  color:#999; cursor:pointer; font-size:13px; line-height:1;',
+    '  width:22px; height:22px; border-radius:4px;',
+    '  display:flex; align-items:center; justify-content:center; }',
+    '#oml2d-chat-close:hover { background:#f0f0f0; color:#333; }',
     '#oml2d-chat-log { flex:1; min-height:0; overflow-y:auto; padding:12px;',
-    '  display:flex; flex-direction:column; gap:10px; scrollbar-width:thin;',
-    '  scrollbar-color:#b9dcea transparent; }',
-    '#oml2d-chat-log::-webkit-scrollbar { width:6px; }',
-    '#oml2d-chat-log::-webkit-scrollbar-thumb { background:#b9dcea; border-radius:3px; }',
-    '.oml2d-msg { max-width:86%; padding:8px 11px; border-radius:14px; white-space:pre-wrap;',
+    '  display:flex; flex-direction:column; gap:8px;',
+    '  scrollbar-width:thin; scrollbar-color:#d4d4d4 transparent; }',
+    '#oml2d-chat-log::-webkit-scrollbar { width:5px; }',
+    '#oml2d-chat-log::-webkit-scrollbar-thumb { background:#d4d4d4; border-radius:3px; }',
+    '#oml2d-chat-log::-webkit-scrollbar-track { background:transparent; }',
+    '.oml2d-msg { max-width:84%; padding:8px 11px; border-radius:8px; white-space:pre-wrap;',
     '  word-break:break-word; font-size:13px; line-height:1.6; }',
-    '.oml2d-msg.user { align-self:flex-end; background:#dff3ff; color:#134e6a;',
-    '  border-bottom-right-radius:4px; }',
-    '.oml2d-msg.bot { align-self:flex-start; background:#f4f8fb; color:#334155;',
-    '  border:1px solid #e3eef5; border-bottom-left-radius:4px; }',
-    '.oml2d-msg.error { background:#fff1f2; color:#be123c; border-color:#fecdd3; }',
-    '.oml2d-caret { display:inline-block; width:7px; height:13px; margin-left:2px;',
-    '  vertical-align:-2px; background:#38bdf8; animation:oml2d-blink 1s steps(2,start) infinite; }',
-    '@keyframes oml2d-blink { to { visibility:hidden; } }',
-    '#oml2d-chat-form { display:flex; gap:8px; padding:10px; border-top:1px solid #e3eef5; background:#fbfdff; }',
-    '#oml2d-chat-input { flex:1; min-width:0; resize:none; height:38px; padding:8px 10px;',
-    '  border:1px solid #cfe3ef; border-radius:10px; outline:none; background:#fff; color:#334155;',
+    '.oml2d-msg.user { align-self:flex-end; background:#1f1f1f; color:#fff; }',
+    '.oml2d-msg.bot { align-self:flex-start; background:#f4f4f4; color:#333; }',
+    '.oml2d-msg.error { background:#fff; color:#333; border:1px solid #d4d4d4; }',
+    '.oml2d-caret { display:inline-block; width:6px; height:12px; margin-left:2px;',
+    '  vertical-align:-2px; background:#a3a3a3; }',
+    '#oml2d-chat-form { display:flex; gap:8px; padding:10px;',
+    '  border-top:1px solid #eee; background:#fff; }',
+    '#oml2d-chat-input { flex:1; min-width:0; resize:none; height:36px; padding:8px 10px;',
+    '  border:1px solid #dcdcdc; border-radius:6px; outline:none;',
+    '  background:#fff; color:#333;',
     '  font-family:inherit; font-size:13px; line-height:1.4; }',
-    '#oml2d-chat-input:focus { border-color:#7dd3fc; box-shadow:0 0 0 3px rgba(125,211,252,.22); }',
-    '#oml2d-chat-send { flex:0 0 60px; border:0; border-radius:10px; cursor:pointer;',
-    '  background:linear-gradient(135deg,#38bdf8,#818cf8); color:#fff;',
-    '  font-family:inherit; font-size:13px; font-weight:600;',
-    '  transition:filter .18s,transform .18s; }',
-    '#oml2d-chat-send:hover:not(:disabled) { filter:brightness(1.06); transform:translateY(-1px); }',
-    '#oml2d-chat-send:disabled { opacity:.55; cursor:not-allowed; }',
-    '@media (max-width:720px) {',
-    '  #oml2d-chat { left:12px; right:12px; width:auto; bottom:150px; height:min(52vh,380px); }',
-    '  #oml2d-chat-launcher { left:12px; right:12px; bottom:150px; text-align:center; }',
-    '}'
+    '#oml2d-chat-input:focus { border-color:#1f1f1f; }',
+    '#oml2d-chat-input::placeholder { color:#a3a3a3; }',
+    '#oml2d-chat-send { flex:0 0 56px; border:0; border-radius:6px; cursor:pointer;',
+    '  background:#1f1f1f; color:#fff; font-family:inherit; font-size:13px; font-weight:500; }',
+    '#oml2d-chat-send:hover:not(:disabled) { background:#3d3d3d; }',
+    '#oml2d-chat-send:disabled { opacity:.45; cursor:not-allowed; }',
+    '@media (max-width:720px) { #oml2d-chat { border-radius:6px; } }'
   ].join('');
   document.head.appendChild(css);
 
@@ -142,7 +138,7 @@
     try { localStorage.removeItem(STORE_KEY); } catch (err) {}
   });
 
-  /* 4) 小鲸鱼 AI 聊天：SSE 流式输出 + 紧贴 Live2D 的对话气泡 */
+  /* 4) 大肥鱼 AI 聊天：SSE 流式输出 + 紧贴 Live2D 的对话气泡 */
   var THREAD_KEY = 'whale-agent-thread-id';
   var THREAD_ID = (function () {
     var id = null;
@@ -158,18 +154,12 @@
   var busy = false;
   var abortController = null;
 
-  var launcher = document.createElement('button');
-  launcher.id = 'oml2d-chat-launcher';
-  launcher.type = 'button';
-  launcher.textContent = '🐳 和小鲸鱼聊天';
-  wrapper.appendChild(launcher);
-
   var panel = document.createElement('div');
   panel.id = 'oml2d-chat';
   panel.innerHTML =
     '<div id="oml2d-chat-head">' +
-      '<span>🐳 小鲸鱼</span>' +
-      '<span class="oml2d-chat-sub">DeepSeek 驱动</span>' +
+      '<span class="oml2d-chat-avatar">🐳</span>' +
+      '<span class="oml2d-chat-title">大肥鱼</span>' +
       '<button type="button" id="oml2d-chat-close" aria-label="关闭聊天">✕</button>' +
     '</div>' +
     '<div id="oml2d-chat-log"></div>' +
@@ -178,7 +168,8 @@
         'placeholder="问问博客或技术的问题～"></textarea>' +
       '<button type="submit" id="oml2d-chat-send">发送</button>' +
     '</form>';
-  wrapper.appendChild(panel);
+  // 面板挂在 body 上（不在 wrapper 内），拖动模型时不会带着它一起动
+  document.body.appendChild(panel);
 
   var log = panel.querySelector('#oml2d-chat-log');
   var form = panel.querySelector('#oml2d-chat-form');
@@ -213,19 +204,123 @@
     busy = state;
     sendBtn.textContent = state ? '停止' : '发送';
     input.placeholder = state
-      ? '小鲸鱼正在思考…（点“停止”可打断）'
+      ? '大肥鱼正在思考…（点“停止”可打断）'
       : '问问博客或技术的问题～';
     if (!state && chatOpen) input.focus();
   }
 
-  function toggleChat(forceOpen) {
-    chatOpen = typeof forceOpen === 'boolean' ? forceOpen : !chatOpen;
-    panel.classList.toggle('is-open', chatOpen);
-    launcher.style.display = chatOpen ? 'none' : '';
-    if (chatOpen) input.focus();
+  var PANEL_W = 320;
+  var PANEL_H = 420;
+
+  function clampNum(v, min, max) {
+    return max < min ? max : Math.max(min, Math.min(v, max));
   }
 
-  launcher.addEventListener('click', function () { toggleChat(true); });
+  /* 依据模型舞台的位置把面板贴到旁边（面板固定在 body 上，坐标即视口坐标） */
+  function positionChatUi() {
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+    var margin = 12;
+    var gap = 12;
+
+    // 窄屏：面板贴底，左右留边
+    if (vw <= 720) {
+      var h = Math.min(Math.round(vh * 0.52), 380);
+      panel.style.width = (vw - margin * 2) + 'px';
+      panel.style.height = h + 'px';
+      panel.style.left = margin + 'px';
+      panel.style.top = Math.max(margin, vh - margin - h) + 'px';
+      return;
+    }
+
+    panel.style.width = PANEL_W + 'px';
+    panel.style.height = PANEL_H + 'px';
+
+    var stage = document.getElementById('oml2d-stage');
+    if (!stage) {
+      // 模型尚未创建：先放右下角
+      panel.style.left = (vw - PANEL_W - margin) + 'px';
+      panel.style.top = (vh - PANEL_H - margin) + 'px';
+      return;
+    }
+
+    var sr = stage.getBoundingClientRect();
+    // 模型在哪半边，面板就贴到另一侧，底部与模型对齐
+    var toRight = sr.left + sr.width / 2 < vw / 2;
+    var left = toRight ? sr.right + gap : sr.left - PANEL_W - gap;
+    left = clampNum(left, margin, vw - PANEL_W - margin);
+    var top = clampNum(sr.bottom - PANEL_H, margin, vh - PANEL_H - margin);
+
+    panel.style.left = Math.round(left) + 'px';
+    panel.style.top = Math.round(top) + 'px';
+  }
+
+  /* 拖动过之后只做边界收拢，不再自动贴模型 */
+  function clampPanelPos() {
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+    var w = panel.offsetWidth || PANEL_W;
+    var h = panel.offsetHeight || PANEL_H;
+    var left = clampNum(parseFloat(panel.style.left) || 0, 8, vw - w - 8);
+    var top = clampNum(parseFloat(panel.style.top) || 0, 8, vh - h - 8);
+    panel.style.left = Math.round(left) + 'px';
+    panel.style.top = Math.round(top) + 'px';
+  }
+
+  /* 面板拖拽：按住头部独立移动，不影响 Live2D 位置 */
+  var panelDragged = false;
+  var panelDrag = null;
+  var chatHead = panel.querySelector('#oml2d-chat-head');
+
+  chatHead.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+    if (e.target.closest('#oml2d-chat-close')) return;
+    var r = panel.getBoundingClientRect();
+    panelDrag = { x: e.clientX, y: e.clientY, left: r.left, top: r.top };
+    panel.classList.add('is-dragging');
+    e.preventDefault();
+  });
+
+  document.addEventListener('pointermove', function (e) {
+    if (!panelDrag) return;
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+    var left = panelDrag.left + (e.clientX - panelDrag.x);
+    var top = panelDrag.top + (e.clientY - panelDrag.y);
+    left = clampNum(left, 8, vw - panel.offsetWidth - 8);
+    top = clampNum(top, 8, vh - panel.offsetHeight - 8);
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+  });
+
+  document.addEventListener('pointerup', function () {
+    if (!panelDrag) return;
+    panelDrag = null;
+    panelDragged = true;
+    panel.classList.remove('is-dragging');
+  });
+
+  function placeChatPanel() {
+    var narrow = document.documentElement.clientWidth <= 720;
+    if (panelDragged && !narrow) clampPanelPos();
+    else positionChatUi();
+  }
+
+  function toggleChat(forceOpen) {
+    chatOpen = typeof forceOpen === 'boolean' ? forceOpen : !chatOpen;
+    if (chatOpen) {
+      panel.classList.add('is-open');
+      placeChatPanel();
+      input.focus();
+    } else {
+      panel.classList.remove('is-open');
+    }
+  }
+
+  window.addEventListener('resize', function () {
+    if (chatOpen) placeChatPanel();
+  });
+
   panel.querySelector('#oml2d-chat-close').addEventListener('click', function () {
     toggleChat(false);
   });
@@ -308,7 +403,7 @@
       return pump().then(function () {
         if (buffer.trim()) handleFrame(buffer, msg);
         if (!msg.body.nodeValue) {
-          msg.body.nodeValue = '（小鲸鱼这次没说话，再问一次试试～）';
+          msg.body.nodeValue = '（大肥鱼这次没说话，再问一次试试～）';
         }
       });
     }).catch(function (err) {
@@ -326,7 +421,7 @@
     });
   }
 
-  addMessage('bot', '嗨～我是小鲸鱼 🐳\n博客、技术或者随便聊聊，都可以问我！');
+  addMessage('bot', '嗨～我是大肥鱼 🐳\n博客、技术或者随便聊聊，都可以问我！');
 
   /* 5) 组件配置 */
   var options = {
@@ -378,23 +473,32 @@
           .concat([{
             id: 'Chat',
             icon: 'oml2d-icon-chat',
-            title: '和小鲸鱼聊天 🐳',
+            title: '和大肥鱼聊天 🐳',
             onClick: function () { toggleChat(); }
           }]);
       }
     }
   };
 
-  /* 6) 加载 CDN 并初始化 */
-  var script = document.createElement('script');
-  script.src = CDN;
-  script.onload = function () {
-    if (window.OML2D) window.OML2D.loadOml2d(options);
-  };
-  script.onerror = function () {
-    console.warn('[Live2D] CDN 加载失败：' + CDN);
-  };
-  document.head.appendChild(script);
+  /* 6) 加载 oh-my-live2d 并初始化：本地优先，逐个源回退 */
+  function loadLib(index) {
+    if (index >= OML2D_SOURCES.length) {
+      console.warn('[Live2D] oh-my-live2d 所有源均加载失败');
+      return;
+    }
+    var script = document.createElement('script');
+    script.src = OML2D_SOURCES[index];
+    script.onload = function () {
+      if (window.OML2D) window.OML2D.loadOml2d(options);
+    };
+    script.onerror = function () {
+      console.warn('[Live2D] 加载失败，尝试下一个源：' + OML2D_SOURCES[index]);
+      if (script.parentNode) script.parentNode.removeChild(script);
+      loadLib(index + 1);
+    };
+    document.head.appendChild(script);
+  }
+  loadLib(0);
 
   /* 7) 「加载成功」提示 3 秒后隐藏；切换到其它文案时自动恢复 */
   (function () {
