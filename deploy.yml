@@ -29,6 +29,10 @@ jobs:
         run: |
           lektor build --output-path ./dist
 
+      - name: Export blog data for Whale Agent
+        run: |
+          python scripts/export_blog_data.py --site-url https://wanjc.top --output ./dist_blog_data
+
       - name: Deploy to Ubuntu Server
         uses: easingthemes/ssh-deploy@main
         with:
@@ -39,3 +43,13 @@ jobs:
           REMOTE_USER: ${{ secrets.SERVER_USER }}
           TARGET: "/var/www/wanjc.top"
           EXCLUDE: "/dist/, /node_modules/"
+
+      - name: Deploy blog data to Whale Agent
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          ARGS: "-rlgoDzvc -i --delete --chmod=D755,F644"
+          SOURCE: "dist_blog_data/"
+          REMOTE_HOST: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: "/home/wjc/blog_data"

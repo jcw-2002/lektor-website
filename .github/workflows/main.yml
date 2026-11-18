@@ -41,7 +41,12 @@ jobs:
         run: |
           uv run lektor build -f webpack --output-path ./dist
 
-      # 6. 同步到 Ubuntu 服务器
+      # 6. 导出博客纯文本/Markdown 数据（whale_agent 博客知识库的数据源）
+      - name: Export blog data for Whale Agent
+        run: |
+          uv run python scripts/export_blog_data.py --site-url https://wanjc.top --output ./dist_blog_data
+
+      # 7. 同步网站到 Ubuntu 服务器
       - name: Deploy to Ubuntu Server
         uses: easingthemes/ssh-deploy@main
         with:
@@ -52,3 +57,16 @@ jobs:
           REMOTE_USER: ${{ secrets.SERVER_USER }}
           TARGET: "/var/www/wanjc.top"
           EXCLUDE: "/dist/, /node_modules/"
+
+      # 8. 同步博客数据到 whale_agent 数据目录
+      #    注意：目标必须是独立目录，不能放进 /var/www/wanjc.top（会被上一步 --delete 清掉）
+      #    --chmod 保证以 root 推送时 wjc 用户依然可读
+      - name: Deploy blog data to Whale Agent
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          ARGS: "-rlgoDzvc -i --delete --chmod=D755,F644"
+          SOURCE: "dist_blog_data/"
+          REMOTE_HOST: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: "/home/wjc/blog_data"
