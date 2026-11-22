@@ -41,6 +41,21 @@
   ];
   var STORE_KEY = 'oml2d-drag-offset';
 
+  /* 窄屏判定：必须与库内部一致（screen and (max-width: 768px)） */
+  var MOBILE_MQ = window.matchMedia('screen and (max-width: 768px)');
+  /*
+   * 窄屏是否自动加载模型。false = 库走 mobileHidden 分支：不加载模型，
+   * 只弹一条「看板娘休息中」的提示。点这条提示后我们在运行时把
+   * options.mobileDisplay 打开再 reloadModel()，模型才以 MOBILE_STAGE 的小尺寸滑进来。
+   */
+  var MOBILE_DISPLAY = false;
+  /*
+   * 窄屏模型尺寸/缩放。桌面是 320×450、scale 0.08，
+   * 这里按宽度比例缩到一半左右（0.08 × 168/320 ≈ 0.042）。
+   */
+  var MOBILE_STAGE = { width: 168, height: 220 };
+  var MOBILE_SCALE = 0.042;
+
   /* 1) 统一容器：舞台、状态条、菜单、提示框都在里面，只拖这一个元素 */
   var wrapper = document.createElement('div');
   wrapper.id = 'oml2d-wrapper';
@@ -50,9 +65,43 @@
 
   var css = document.createElement('style');
   css.textContent = [
-    '#oml2d-wrapper > * { pointer-events:auto; }',
-    '#oml2d-stage { touch-action:none !important; cursor:grab !important; }',
+    /*
+     * 只有真正可见的部件才接收指针事件。
+     * 原来写的是 '#oml2d-wrapper > * { pointer-events:auto; }'，于是舞台上那块
+     * 空区域也会吃掉点击 —— 移动端汉堡按钮点不动就是这么来的。
+     */
+    '#oml2d-wrapper > * { pointer-events:none; }',
+    '#oml2d-stage, #oml2d-canvas, #oml2d-menus, #oml2d-menus *, #oml2d-statusBar,',
+    '  #oml2d-statusBar *, #oml2d-tips { pointer-events:auto; }',
+
+    /*
+     * 舞台几何兜底。
+     *
+     * oh-my-live2d 在窄屏（<=768px）且 mobileDisplay=false 时走 mobileHidden 分支：
+     * 只调用 slideOut() 设个动画，从不执行 reloadStyle()，所以 #oml2d-stage 上
+     * 没有 position / width / height。它作为 wrapper 里的普通块级元素就贴在视口
+     * 左上角，变成一条整宽的透明带（画布被 pixi 撑成 100% 宽、几十像素高），
+     * 正好压住顶部导航栏，汉堡按钮的点击全被它吞掉。
+     *
+     * 这里把舞台固定死在左下角并给出尺寸，无论库有没有写样式都不会再跑到顶部。
+     */
+    '#oml2d-stage { position:fixed !important; left:0 !important; top:auto !important;',
+    '  right:auto !important; bottom:0 !important; z-index:9997 !important;',
+    '  width:320px !important; height:450px !important;',
+    '  touch-action:none !important; cursor:grab !important; }',
     '#oml2d-wrapper.is-dragging #oml2d-stage { cursor:grabbing !important; }',
+
+    /*
+     * 窄屏：模型缩到 MOBILE_STAGE（168×220），只有左下角这一小块可交互。
+     * 舞台背景、气泡不接收指针事件，页面其余区域完全不受影响；
+     * 画布（模型本体）保留 auto —— 这样才能拖动、点出菜单、打开聊天。
+     */
+    '@media (max-width: 768px) {',
+    '  #oml2d-stage { width:' + MOBILE_STAGE.width + 'px !important;',
+    '    height:' + MOBILE_STAGE.height + 'px !important; }',
+    '  #oml2d-stage, #oml2d-tips { pointer-events:none !important; }',
+    '  #oml2d-canvas { pointer-events:auto !important; }',
+    '}',
 
     /* ===== 大肥鱼聊天面板：单色极简，挂在 body 上，可单独拖动 ===== */
     '#oml2d-chat { position:fixed; left:0; top:0; width:320px; height:420px;',
@@ -172,9 +221,23 @@
     try { localStorage.setItem(STORE_KEY, JSON.stringify(offset)); } catch (e) {}
   }
   function applyOffset() {
+    clampOffset();
     wrapper.style.transform = (offset.x || offset.y)
       ? 'translate(' + offset.x + 'px, ' + offset.y + 'px)'
       : 'none';
+  }
+  /* 拖拽范围收拢：始终让模型至少有 60px 留在视口内。
+     手机上也一样 —— 位置会写进 localStorage，拖丢了下回打开就找不到了。 */
+  function clampOffset() {
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+    var stage = document.getElementById('oml2d-stage');
+    var w = (stage && stage.offsetWidth) || 0;
+    var h = (stage && stage.offsetHeight) || 0;
+    if (!w || !h) return;
+    var keep = 60;
+    offset.x = Math.min(Math.max(offset.x, keep - w), vw - keep);
+    offset.y = Math.min(Math.max(offset.y, keep - h), vh - keep);
   }
   function isDragArea(target) {
     if (target.closest('#oml2d-menus')) return false;
@@ -951,11 +1014,16 @@
   /* 5) 组件配置 */
   var options = {
     parentElement: wrapper,
+    mobileDisplay: MOBILE_DISPLAY,
     models: [{
       path: MODEL,
       scale: 0.08,
       position: [-10, 10],
-      stageStyle: { width: 320, height: 450 }
+      stageStyle: { width: 320, height: 450 },
+      // 窄屏用更小的尺寸和缩放，避免占掉半个屏幕
+      mobileScale: MOBILE_SCALE,
+      mobilePosition: [-6, 6],
+      mobileStageStyle: { width: MOBILE_STAGE.width, height: MOBILE_STAGE.height }
     }],
     // 状态条默认相对视口、菜单默认相对舞台，统一成同一个 bottom 才能对齐
     statusBar: {
@@ -1005,6 +1073,61 @@
     }
   };
 
+  /* ---------- 窄屏：默认休息，点提示唤出 ---------- */
+
+  var oml2d = null;
+  var mobileSummoned = false;
+  var MOBILE_HINT = '点我唤醒看板娘';
+
+  /*
+   * 窄屏初始化时库走 mobileHidden：不加载模型，并在约 1s 后（等 slideOut 动画结束）
+   * 调用 statusBar.rest() 弹一条「看板娘休息中」，8 秒后自动隐藏。
+   * 这里把它改成常驻且可点击的提示：
+   *   - 立刻挂 click；
+   *   - 等库那次 rest() 改完内容后再把文案换成可点击的（popup 会 clearTimeout，
+   *     所以不会再自动隐藏）。
+   */
+  function bindMobileSummon() {
+    if (!oml2d || !MOBILE_MQ.matches) return;
+    var bar = oml2d.statusBar;
+    if (!bar || typeof bar.popup !== 'function') return;
+
+    if (typeof bar.setClickEvent === 'function') bar.setClickEvent(summonMobileModel);
+
+    [1200, 3000].forEach(function (delay) {
+      setTimeout(function () {
+        if (mobileSummoned) return;
+        var el = bar.element;
+        if (el && (el.textContent || '').trim() === MOBILE_HINT) return;
+        bar.popup(MOBILE_HINT, false);   // duration=false：不自动隐藏
+      }, delay);
+    });
+  }
+
+  /* 点提示：运行时打开 mobileDisplay（绕开 mobileHidden）再 reloadModel，
+     模型按窄屏尺寸滑入左下角。 */
+  function summonMobileModel() {
+    if (!oml2d || mobileSummoned) return;
+    mobileSummoned = true;
+    try {
+      var bar = oml2d.statusBar;
+      if (bar && typeof bar.clearClickEvent === 'function') bar.clearClickEvent();
+      oml2d.options.mobileDisplay = true;
+      oml2d.reloadModel();
+      // 舞台尺寸就绪后再收拢一次旧位置，避免上次拖到屏幕外的 offset 继续生效
+      setTimeout(applyOffset, 1500);
+    } catch (err) {
+      console.warn('[Live2D] 唤醒看板娘失败：', err);
+    }
+  }
+
+  // 从宽屏缩到窄屏（旋屏/改窗口）时，补一次提示绑定
+  if (typeof MOBILE_MQ.addEventListener === 'function') {
+    MOBILE_MQ.addEventListener('change', function () {
+      if (MOBILE_MQ.matches && oml2d) bindMobileSummon();
+    });
+  }
+
   /* 6) 加载 oh-my-live2d 并初始化：本地优先，逐个源回退 */
   function loadLib(index) {
     if (index >= OML2D_SOURCES.length) {
@@ -1014,7 +1137,10 @@
     var script = document.createElement('script');
     script.src = OML2D_SOURCES[index];
     script.onload = function () {
-      if (window.OML2D) window.OML2D.loadOml2d(options);
+      if (!window.OML2D) return;
+      oml2d = window.OML2D.loadOml2d(options);
+      bindMobileSummon();
+      setTimeout(applyOffset, 1500);   // 舞台有尺寸后，按当前视口收拢一次位置
     };
     script.onerror = function () {
       console.warn('[Live2D] 加载失败，尝试下一个源：' + OML2D_SOURCES[index]);
