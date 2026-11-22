@@ -173,6 +173,12 @@ body.poster {
   h2 {
     color: $brand-primary;
   }
+
+  // 首页正文图片不撑破容器（移动端避免横向溢出）
+  img {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
 body.default {
