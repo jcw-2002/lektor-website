@@ -587,67 +587,35 @@ ul.tree-nav {
   margin: 25px 0;
   padding: 0;
   list-style: none;
+  font-size: 14px;
+  line-height: 1.5;
 
   li {
     padding: 0;
     margin: 0;
+    list-style: none;
 
     + li {
       border-top: 1px solid #ddd;
     }
 
-    &.active {
-      > a {
-        font-weight: bold;
-        color: $toner;
-      }
-    }
-
-    > li.tree-group {
-      border-top: 1px solid #ddd;
-    }
-
-    > li.tree-group > details > summary.tree-group-title {
-      list-style: none;
-      cursor: pointer;
-      padding: 5px 10px;
+    &.active > a {
       font-weight: bold;
       color: $toner;
-      user-select: none;
-
-      &::-webkit-details-marker { display: none; }
-      &::marker { display: none; content: ''; }
-
-      &::before {
-        content: '▸';
-        display: inline-block;
-        margin-right: 6px;
-        transition: transform 0.15s ease;
-      }
     }
 
-    > li.tree-group > details[open] > summary.tree-group-title::before {
-      transform: rotate(90deg);
-    }
-
-    > li.tree-group > details > ul.tree-group-items {
-      list-style: none;
-      margin: 0;
-      padding: 0 0 0 18px;
-
-      > li {
-        border-top: 1px solid #ddd;
-        font-size: 14px;
-      }
-    }
-
-    a {
+    > a {
       display: block;
       padding: 5px 10px;
+      text-decoration: none;
+
+      &:hover,
+      &:focus {
+        text-decoration: underline;
+      }
 
       @media (max-width: $screen-sm-max) {
         padding: 3px 10px;
-        font-size: 14px;
       }
 
       @media (max-width: $screen-xs-max) {
@@ -657,6 +625,69 @@ ul.tree-nav {
 
     @media (max-width: $screen-xs-max) {
       border: none!important;
+    }
+  }
+
+  // 专栏根标题（如「编程」）：比分组标题再大一号
+  > li.tree-root > a {
+    padding: 9px 10px;
+    font-size: 18px;
+    font-weight: bold;
+    color: $toner;
+  }
+
+  // 分类分组标题（如 Python / 博客）：加粗、比子项大、悬停下划线
+  > li.tree-group {
+    > details {
+      > summary.tree-group-title {
+        list-style: none;
+        cursor: pointer;
+        padding: 9px 10px;
+        font-size: 17px;
+        font-weight: bold;
+        line-height: 1.5;
+        color: $toner;
+        user-select: none;
+
+        &::-webkit-details-marker { display: none; }
+        &::marker { display: none; content: ''; }
+
+        &::before {
+          content: '▸';
+          display: inline-block;
+          width: 1em;
+          margin-right: 4px;
+          color: $brand-primary;
+          transition: transform 0.15s ease;
+        }
+
+        &:hover,
+        &:focus {
+          text-decoration: underline;
+        }
+      }
+
+      &[open] > summary.tree-group-title::before {
+        transform: rotate(90deg);
+      }
+
+      > ul.tree-group-items {
+        list-style: none;
+        margin: 0;
+        padding: 0 0 5px 0;
+
+        > li {
+          border-top: 1px solid #ddd;
+          padding-left: 0;
+          margin-left: 0;
+          font-size: 14px;
+
+          > a {
+            padding: 4px 10px 4px 30px;
+            font-weight: normal;
+          }
+        }
+      }
     }
   }
 

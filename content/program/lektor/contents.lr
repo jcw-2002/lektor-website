@@ -30,7 +30,8 @@ lektor quickstart
 lektor server
 uv run lektor server -f webpack
 ```
-
+启动后端：
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 
 # MD写作格式

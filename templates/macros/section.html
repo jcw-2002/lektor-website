@@ -48,8 +48,8 @@
   {% endfor %}
 
   <ul class="tree-nav nocontent">
-    <li{% if page._path == root._path %} class="active"{% endif
-      %}><a href="{{ root|url }}">{{ root.title }}</a></li>
+    <li class="tree-root{% if page._path == root._path %} active{% endif
+      %}"><a href="{{ root|url }}">{{ root.title }}</a></li>
 
     {% for cat in cat_ns.order %}
       {% set grp_ns = namespace(active=False) %}

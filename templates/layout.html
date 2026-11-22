@@ -24,7 +24,8 @@
         <a class="navbar-brand" href="{{ '/'|url }}">W JC</a>
       </div>
       <div id="navbar" class="collapse navbar-collapse">
-        <ul class="nav navbar-nav">
+        {# id 供 PJAX 单独替换：只有 active 高亮会随页面变化，避免整条导航被重建 #}
+        <ul class="nav navbar-nav" id="pjax-nav">
           {% for id, item in bag('menu').items() %}
             <li{% if this.is_child_of(item.path) %} class="active"{% endif
               %}><a href="{{ item.path|url }}">{{ item.label }}</a></li>
@@ -35,11 +36,23 @@
   </nav>
 
   <div class="body-wrapper">
-    {% block outerbody %}
-    <div class="container">
-      {% block body %}{% endblock %}
-    </div>
-    {% endblock %}
+    {#
+      PJAX 唯一替换的区域：<title>、这里的正文、以及上面的 #pjax-nav 会随路由变化。
+      - 所有继承 layout.html 的模板（page / blog-post / gallery / doc-page ...）都通过
+        outerbody 或 body 块渲染，天然落在这个 <main> 里，无需改动。
+      - Live2D（#oml2d-wrapper）和 AI 对话面板（#oml2d-chat）由
+        assets/live2d/widget.js 直接挂到 <body> 上，刻意放在容器之外，
+        切页时不会被销毁，也不会重复执行初始化。
+      - data-bodyclass 把各页的 body class（poster / default）带过来，
+        供 pjax:complete 同步，首页的排版样式因此不会在切页后错乱。
+    #}
+    <main id="pjax-container" data-bodyclass="{{ self.bodyclass()|trim }}">
+      {% block outerbody %}
+      <div class="container">
+        {% block body %}{% endblock %}
+      </div>
+      {% endblock %}
+    </main>
   </div>
 
   {% block bottomsummary %}
@@ -100,6 +113,12 @@
   <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
   <!-- <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script> -->
   <!-- <script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script> -->
+
+  <!-- PJAX 局部无刷新跳转：只切换 #pjax-container / #pjax-nav / <title>。
+       实现见 assets/js/pjax.js；库本地优先（assets/js/vendor/pjax.min.js），
+       CDN 兜底，全部加载失败时自动退化成普通整页跳转。 -->
+  <script src="{{ '/js/pjax.js'|asseturl }}"
+          data-lib="{{ '/js/vendor/pjax.min.js'|asseturl }}"></script>
 
   <!-- Live2D 看板娘：实现见 assets/live2d/widget.js（聊天面板/样式/逻辑均已内置） -->
   <!-- 不写 data-chat-api：widget.js 默认走同源 /api/chat，由 Nginx 反代到后端。

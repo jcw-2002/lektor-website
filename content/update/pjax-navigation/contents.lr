@@ -1,0 +1,184 @@
+title: PJAX 局部跳转 + AI 对话持久化改造
+---
+summary: 站内切页不再整页刷新：只替换正文容器与导航高亮，Live2D 看板娘与 AI 对话面板全程存活；同时把对话历史与展开状态存进 sessionStorage，F5 与切页都不再丢记录。
+---
+pub_date: 2026-11-23
+---
+author: jcw
+---
+body:
+
+#### text-block ####
+text:
+
+# PJAX 局部跳转 + AI 对话持久化改造
+
+> 项目路径：`f:\program\blog\lektor-website`
+
+## 一、需求背景
+
+站点此前已经接入了基于 `oh-my-live2d` 的看板娘（大肥鱼）和基于 SSE 流式输出的 AI 对话气泡，两者都由 `assets/live2d/widget.js` 动态创建并挂在 `<body>` 上。但站内跳转一直是整页刷新，于是出现三个问题：
+
+1. **看板娘反复重载**：每次点导航都要重新拉模型、重新执行 `widget.js`，右侧形象要闪一下才回来。
+2. **对话状态丢失**：聊到一半切到别的页面，面板被销毁，回来只剩一句欢迎语。
+3. **F5 也会丢**：硬刷新同样清空对话。`thread_id` 其实一直存在 `sessionStorage` 里，丢的是界面和消息数组。
+
+目标：**站内切页不重建 `<body>`**（PJAX 局部替换），**对话历史与展开状态落盘**（前端持久化），并且不能破坏现有 Live2D 的渲染与样式。
+
+## 二、为什么整页刷新一定会丢
+
+| 整页刷新的后果 | 具体表现 |
+|---|---|
+| `document` 全部重建 | `#oml2d-wrapper`、`#oml2d-chat` 被销毁，连同事件监听和进行中的 `fetch` |
+| `widget.js` 重新执行 | 模型重新初始化、拖拽位置与面板尺寸重新读取、流式回复中断 |
+| 消息只存在闭包变量里 | 历史消息、面板展开状态一律归零 |
+| `thread_id` 并没丢 | 它本来就在 `sessionStorage`，丢的是 UI 与消息数组 |
+
+结论：**要保住运行时，就不能换 `<body>`；要保住界面，就得把历史存下来。** 两件事分开处理。
+
+## 三、方案一：PJAX 只替换该替换的区域
+
+### 1. 先梳理模板结构
+
+所有页面都继承 `templates/layout.html`，切页时真正会变的只有三处：
+
+| 区域 | 是否随路由变化 | 处理方式 |
+|---|---|---|
+| `<title>` | 变化 | 放进 `selectors` |
+| 正文（banner + `.container` + 侧栏 / TOC） | 变化 | 包进 `<main id="pjax-container">` |
+| 导航 `<ul>` 的 `active` 高亮 | 变化 | 单独给 `id="pjax-nav"` |
+| 导航栏骨架、`bottomsummary`、`footer` | 不变 | 不进容器 |
+| Live2D 与对话面板 | 不该变 | 挂在 `<body>` 上，容器之外 |
+
+关键一步是把 `<main>` 放在 `{% block outerbody %}` **外面**。因为 `page.html`、`blog-post.html`、`gallery.html`、`blog-layout.html`、`showcase*.html` 都是覆写 `outerbody` 或 `body` 块，包在外面之后这些模板**一行都不用改**。
+
+```html
+<div class="body-wrapper">
+  <main id="pjax-container" data-bodyclass="{{ self.bodyclass()|trim }}">
+    {% block outerbody %}
+    ...
+    {% endblock %}
+  </main>
+</div>
+```
+
+`data-bodyclass` 是个小技巧：首页用 `poster` 模板（`body.poster` 有独立样式），其它页是 `default`。把它随容器带到新页面，切页后再同步给 `<body>`，否则从首页切出去会残留 `poster` 样式。
+
+### 2. 库与初始化参数
+
+新增 `assets/js/pjax.js`，按「本地托管 → jsDelivr → unpkg」三级加载，全部失败就静默降级成普通整页跳转：
+
+```js
+new window.Pjax({
+  elements: 'a[href]:not([href^="#"])'
+          + ':not([href^="javascript:"]):not([href^="mailto:"])'
+          + ':not([href^="tel:"]):not([target])'
+          + ':not([download]):not([href^="/admin"])'
+          + ':not([data-pjax="false"])',
+  selectors: ['title', '#pjax-container', '#pjax-nav'],
+  cacheBust: false,
+  scrollTo: 0,
+  timeout: 15000
+});
+```
+
+两个容易踩的点：
+
+- **`cacheBust: false`**：库默认给请求加 `?t=时间戳`，而它会跟着 `pushState` 一起写进地址栏，所以关掉。
+- **`elements` 必须自己排除 `[target]` / `[download]` / `/admin`**：选用的 `MoOx/pjax` 0.2.8 只判断「是否外链」「是否同页锚点」，`target="_blank"`、下载链接、后台路径它都会照接。
+
+### 3. 选择器表达不了的情况
+
+图片墙 `/img/...` 下的 `<a href="/img/xxx.jpg">` 是同源链接，但服务器返回的是图片。被 PJAX 接管后会「请求图片 → DOM 不匹配 → 再整页跳一次」，白白多一个来回。
+
+所以补了一个捕获阶段的兜底：命中文件后缀就 `stopPropagation()`。因为 pjax 的点击监听挂在 `<a>` 自己身上，截断后浏览器走原生跳转，而 `stopPropagation` 不阻止默认行为，看图、下载都正常。
+
+```js
+function guardClick(e) {
+  if (!pjax || e.defaultPrevented || e.button !== 0) return;
+  var a = findAnchor(e.target);
+  if (!a) return;
+  if (FILE_RE.test(a.pathname || '')) e.stopPropagation();
+}
+```
+
+### 4. 切页后的重初始化
+
+在 `pjax:complete` 里补了这些：
+
+| 项目 | 处理 |
+|---|---|
+| `body` class | 从 `data-bodyclass` 同步（`poster` / `default`） |
+| 代码高亮 | 本站是服务端 Pygments，无需重跑；预留 Prism / highlight.js 分支 |
+| 数学公式 | 预留 KaTeX `renderMathInElement` / MathJax `typesetPromise` |
+| 评论（Disqus） | `DISQUS.reset({ reload: true, config: disqus_config })`，否则 thread 停在上一页 |
+| Bootstrap 轮播 | 能拿到全局 jQuery 时补一次 `.carousel()` |
+| 移动端导航 | 收起展开的 `#navbar`，否则看起来像没跳页 |
+
+正文里的内联 `<script>` 不用自己处理：pjax 在切换后会把 selector 内的 `text/javascript` 脚本「移除 + 重新挂到 head 执行」，每次切页执行一次，不会重复。
+
+### 5. 为什么不自己写 scrollTo(0, 0)
+
+一开始确实在 `pjax:complete` 里加了回顶，后来删掉了。`scrollTo: 0` 已经覆盖四种情况：成功切页回顶部、带 `#hash` 滚到锚点、前进/后退恢复原位置、请求失败原地不动。自己再滚一次，反而会在超时或失败时把页面弹到顶部。
+
+## 四、方案二：对话持久化
+
+### 1. 存什么
+
+| 键 | 内容 | 说明 |
+|---|---|---|
+| `oml2d-chat-history` | `[{ role, text }]`，最多 40 条 | 只存纯文本，渲染仍走 `addMessage` / `mdToHtml` |
+| `oml2d-chat-open` | `"1"` / `"0"` | 面板展开状态 |
+| `whale-agent-thread-id` | 会话 ID（原有） | 服务端靠它找 LangGraph 检查点 |
+
+用 `sessionStorage` 而不是 `localStorage`：对话是「这一次浏览」的临时状态，关掉标签页就该清空，也不该跨标签页串味。
+
+### 2. 写入时机
+
+- 用户发送消息 → `addMessage()` 内部立即写入；
+- Agent 流式输出结束（正常 / 出错 / 被「停止」打断）→ 写一次，**不是每个 token 都写**；
+- `pagehide` 兜底：流还没结束就被 F5 或关页时，把已生成的部分存成残稿，并在真正结束时覆盖，避免历史里出现两条。
+
+### 3. 恢复与兜底
+
+初始化时先 `restoreHistory()`：`JSON.parse` 外面套 `try/catch`，再逐条校验 `role` 与 `text`，坏数据直接丢弃并回落到欢迎语；恢复时不抢输入焦点，只把面板摆回原位。
+
+### 4. 上下文为什么能续上
+
+这个接口的上下文不是「前端传一个消息数组」，而是 **`thread_id` + 服务端 `MemorySaver` 多轮记忆**。`thread_id` 一直存在 `sessionStorage`，所以刷新或切页后仍是同一个会话，恢复出来的历史对模型来说就是真实上下文。
+
+后端 `ChatRequest` 里虽然有 `history` 字段，但注释写明「同一 `thread_id` 连续对话时请留空，避免消息重复」，因此前端刻意不传 —— 传了反而会让上下文翻倍。
+
+### 5. 清空入口
+
+原界面没有清空按钮，这次在面板头部加了一个「清空」：清消息、清 `sessionStorage`，并**重新生成 `thread_id`**。不换 ID 的话服务端旧记忆还在，「清空」只是清了界面。
+
+## 五、涉及文件
+
+| 文件 | 改动 |
+|---|---|
+| `templates/layout.html` | 包 `<main id="pjax-container" data-bodyclass>`；导航 `<ul>` 加 `id="pjax-nav"`；末尾引入 pjax |
+| `assets/js/pjax.js` | 新增：库加载（本地 / CDN 兜底）、链接拦截、`pjax:complete` 重初始化 |
+| `assets/js/vendor/pjax.min.js` | 新增：`MoOx/pjax` 0.2.8（MIT），本地托管 |
+| `assets/live2d/widget.js` | 对话历史与展开状态持久化、`pagehide` 残稿保存、「清空」按钮 |
+
+> 新增脚本放在 `assets/js/` 而不是 `assets/static/`：`.gitignore` 里有 `assets/static/*`，那是 webpack 的输出目录。手写文件放进去既不会进 git，CI 构建（`lektor build -f webpack`）也拿不到。
+
+## 六、验证
+
+| 验证项 | 方式 | 结果 |
+|---|---|---|
+| 模板 | `lektor build` 输出到临时目录 | 通过 |
+| 容器唯一性 | 扫描 554 个 HTML 的 `#pjax-container` / `#pjax-nav` | 每页恰好 1 个 |
+| 切页行为 | jsdom + 真实 pjax 库 + 本地 HTTP + 真实构建产物，18 项 | 全通过 |
+| 持久化 | jsdom 冒烟 16 项（恢复 / 落盘 / 清空 / 脏数据） | 全通过 |
+
+端到端里重点确认：切页后 `<body>` 上的持久节点仍在、`<title>` 与正文确实换新、导航与容器没有被复制出副本、`poster` 与 `default` 能来回同步、浏览器后退能正确恢复。
+
+## 七、注意事项与遗留
+
+1. `/docs/plugins/list/` 是 `_model: redirect`（只渲染 meta refresh，没有 layout），点它会因 DOM 不匹配自动整页跳转 —— 功能正常，只是不无缝。
+2. `/showcase/` 详情页的 Bootstrap 轮播：站点没把 jQuery 暴露到 `window`，PJAX 打开后不会自动播放，点一次箭头后正常（原有行为）。
+3. `/plugins/*` 的 GitHub Star / Fork 按钮由 `buttons.github.io` 在首次加载时渲染，切页后可能需要硬刷新。
+4. 后端重启会丢服务端记忆（`MemorySaver` 在进程内），此时界面历史还在、模型却不知道前文；要彻底解决得换持久化的 checkpointer。
+5. `sessionStorage` 按标签页隔离：新标签页是全新会话，关掉标签页即清空。
