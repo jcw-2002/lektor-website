@@ -67,6 +67,30 @@
   }
 
   /*
+   * 相对地址的坑（「点 W JC 回不到首页」就是它）。
+   *
+   * pjax 用 pushState 换地址栏，但 #pjax-container / #pjax-nav 之外的元素不会被替换：
+   * 左上角的 <a class="navbar-brand" href="./">、页脚的 license/contact 都还是首页那份
+   * HTML，而 href 是相对的，浏览器会按「新地址」重新解析 —— 从首页 ./ 切到 /blog/ 后，
+   * 这个 ./ 就变成 /blog/ 了，于是点 W JC 只是把当前目录再打开一次，永远回不去。
+   *
+   * 站点 url_style = relative，靠模板改不干净（以后新增的固定链接还会踩），
+   * 所以在初始化时把它们固化成绝对地址：此刻 a.href 已按正确的文档地址解析过了。
+   */
+  function freezeOutsideLinks() {
+    var anchors = document.querySelectorAll('a[href]');
+    for (var i = 0; i < anchors.length; i++) {
+      var a = anchors[i];
+      // 会被整块替换的区域交给新页面的 HTML，它们本来就是对的
+      if (a.closest('#' + CONTAINER_ID) || a.closest('#' + NAV_ID)) continue;
+      var href = a.getAttribute('href');
+      if (!href || href.charAt(0) === '#') continue;      // 页内锚点
+      if (typeof a.href !== 'string') continue;           // 排除 SVG <a>
+      a.setAttribute('href', a.href);
+    }
+  }
+
+  /*
    * 兜底的点击拦截（只针对 CSS 选择器表达不了的情况）。
    *
    * pjax 只判断「是否外链 / 是否同页锚点」，文件直链它照接，
@@ -163,6 +187,19 @@
   }
 
   /*
+   * pjax 只在初始化时给「当时已存在」的 <a> 绑事件（attach-link 是逐元素绑，不做委托）。
+   * #pjax-container / #pjax-nav 被整块替换后，新的导航和正文链接就没有监听器了，
+   * 点击会静默退化成整页刷新（Live2D 也跟着重建）。这里补绑一次。
+   */
+  function rebindLinks() {
+    if (!pjax || typeof pjax.refresh !== 'function') return;
+    var regions = [document.getElementById(CONTAINER_ID), document.getElementById(NAV_ID)];
+    for (var i = 0; i < regions.length; i++) {
+      if (regions[i]) pjax.refresh(regions[i]);
+    }
+  }
+
+  /*
    * 切页后的重初始化。
    *
    * 这里不做 window.scrollTo：pjax 的 scrollTo: 0 已经负责「成功切页回顶部」，
@@ -179,6 +216,7 @@
     reinitComments(container);
     reinitCarousel(container);
     collapseNav();
+    rebindLinks();
   }
 
   /* ---------- 启动 ---------- */
@@ -198,6 +236,9 @@
       timeout: 15000,
       debug: false
     });
+
+    // 必须早于任何 pushState：此刻文档地址还是真实地址，相对 href 才解析得对
+    freezeOutsideLinks();
 
     on(document, 'click', guardClick, true);
     on(document, 'pjax:complete', handleComplete);

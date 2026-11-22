@@ -6,8 +6,20 @@
   'use strict';
 
   var current = document.currentScript;
-  var MODEL = (current && current.getAttribute('data-model')) ||
-              '/live2d/dafeiyu/c_0120.model3.json';
+  /*
+   * 模型地址必须在这里就解析成绝对地址。
+   *
+   * 站点 url_style = relative，模板给出的 data-model 是相对当前页面的
+   * （首页 live2d/...，子页 ../live2d/...）。而 oml2d 是异步加载的，真正发请求时
+   * 文档地址可能已经被 PJAX 的 pushState 改成了别的目录，相对路径就会解析到
+   * /blog/live2d/... 这种不存在的位置 —— 控制台里的 404 与随后的
+   * modelSize / transform 崩溃就是这么来的。此刻 document.baseURI 还是真实地址。
+   */
+  var MODEL = new URL(
+    (current && current.getAttribute('data-model')) ||
+    '/live2d/dafeiyu/c_0120.model3.json',
+    document.baseURI
+  ).href;
   // SSE 接口地址：可用 <script data-chat-api="..."> 覆盖
   var CHAT_API = (current && current.getAttribute('data-chat-api')) || defaultChatApi();
 
