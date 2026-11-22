@@ -1,0 +1,297 @@
+_model: section-page
+---
+title: 用 dufs 给静态博客加一个私人网盘（Nginx 反代 /files）
+---
+category: 博客
+---
+root_path: /program/
+---
+pub_date: 2026-11-23
+---
+author: jcw
+---
+body:
+
+博客是 Lektor 生成的静态站，构建产物由 GitHub Actions 同步到云服务器的 `/var/www/wanjc.top`，再由 Nginx 对外提供。这次想在同一个域名下再挂一个私人文件网盘，路径 `/files`：浏览器里能拖拽上传大文件、在线预览、打包下载，而且只有自己输入账号密码才能用。
+
+## 一、需求与约束
+
+| 约束 | 说明 |
+|---|---|
+| 不污染博客仓库 | 网盘文件体积大、含隐私，绝不能进 Git，也不能拖慢每次构建 |
+| 静态站不能有后端 | Lektor 只产出 HTML，上传写入必须有独立进程承接 |
+| 单域名同源 | 不能新开端口/新域名，直接用 `https://wanjc.top/files`，省掉证书和跨域问题 |
+| 只对内网暴露后端 | 后端进程只监听 `127.0.0.1`，外网只能经 Nginx 访问 |
+| 支持大文件 | 几百 MB 的单文件上传下载不能中断、不能 OOM |
+
+## 二、为什么选 dufs
+
+| 方案 | 评价 |
+|---|---|
+| Nextcloud / ownCloud | 功能最全，但要 PHP + 数据库 + 一堆扩展，内存和运维成本对个人站太重 |
+| AList | 强项是聚合各家网盘，配置项多，本地单目录存储反而绕 |
+| 宝塔/1Panel 文件管理 | 依赖面板，且不适合当公开路径长期用 |
+| **dufs（sigoden/dufs）** | 单个 Rust 静态二进制（十几 MB），自带 Web UI、上传、下载、搜索、路径级权限、HTTP Basic/Digest 认证，一条命令起服务 |
+
+个人自用场景，dufs 的「一个二进制 + 一个目录 + 一个 systemd 单元」就是最省心的组合。
+
+## 三、整体架构
+
+```text
+浏览器  --https-->  Nginx (443, wanjc.top)
+                      |-- location /          --> /var/www/wanjc.top        （静态博客）
+                      |-- location ^~ /files  --> http://127.0.0.1:5000     （dufs）
+                                                    |-- /srv/cloud            （文件实际存储）
+```
+
+两个关键点：
+
+1. **dufs 只监听 `127.0.0.1:5000`**，安全组和防火墙都不放行 5000，外网唯一入口是 Nginx。
+2. **dufs 用 `--path-prefix /files` 启动**，它生成的所有链接（下载、面包屑、删除接口）都自带 `/files` 前缀，与 Nginx 的 `location ^~ /files` 严格对齐。
+
+## 四、本地仓库要改什么
+
+先说明一点：这个仓库是**纯 Lektor 代码**，没有 `nginx.conf`、没有 `Dockerfile`、没有容器编排文件，`deploy.yml` 与 `.github/workflows/main.yml` 只负责 SSH 把 `dist/` 推到服务器。所以服务器配置一律不落在仓库里，本地只需改一处——导航栏加个入口。
+
+改动位置是 `templates/layout.html` 的导航 `<ul id="pjax-nav">`，紧跟在 `bag('menu')` 循环后面：
+
+```html
+<ul class="nav navbar-nav" id="pjax-nav">
+  {% for id, item in bag('menu').items() %}
+    <li{% if this.is_child_of(item.path) %} class="active"{% endif
+      %}><a href="{{ item.path|url }}">{{ item.label }}</a></li>
+  {% endfor %}
+  <li><a href="/files" data-pjax="false">云盘</a></li>
+</ul>
+```
+
+两个细节：
+
+- **不用 `|url` 过滤器**。`item.path|url` 走的是 Lektor 的内容路径解析，而 `/files` 是服务器上的反代路径，根本没有对应的 page，写死绝对路径才不会在相对链接风格（`url_style = relative`）下被解析成 `../files`。
+- **必须加 `data-pjax="false"`**。本站启用了 PJAX 局部跳转（只替换 `#pjax-container` 和 `#pjax-nav`），如果让 PJAX 接管这个链接，它会去请求 `/files` 并把 dufs 的整页 HTML 塞进博客的正文容器，样式和交互全会错乱。`assets/js/pjax.js` 的 `ELEMENTS` 选择器里有 `:not([data-pjax="false"])`，加上这个属性就会退回浏览器原生整页跳转。
+
+## 五、服务器安装 dufs
+
+在服务器上以 root 执行下面整段（保存成脚本再跑，避免多层引号打架）：
+
+```bash
+cat <<'OUTER_SCRIPT' > /tmp/install-dufs.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+DUFS_BIN=/usr/local/bin/dufs
+DATA_DIR=/srv/cloud
+UNIT_FILE=/etc/systemd/system/dufs.service
+SERVICE_USER=dufs
+
+echo "==> 1/6 依赖检查"
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update -y && apt-get install -y curl tar ca-certificates
+elif command -v dnf >/dev/null 2>&1; then
+  dnf install -y curl tar ca-certificates
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y curl tar ca-certificates
+fi
+
+echo "==> 2/6 判断 CPU 架构"
+case "$(uname -m)" in
+  x86_64|amd64)  TARGET=x86_64-unknown-linux-musl ;;
+  aarch64|arm64) TARGET=aarch64-unknown-linux-musl ;;
+  armv7l|armv7*) TARGET=armv7-unknown-linux-musleabihf ;;
+  *) echo "不支持的架构: $(uname -m)" >&2; exit 1 ;;
+esac
+echo "    $(uname -m) -> $TARGET"
+
+echo "==> 3/6 查询最新版本"
+TAG="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+      https://github.com/sigoden/dufs/releases/latest | sed 's#.*/tag/##')"
+[ -n "$TAG" ] || { echo "无法获取版本号" >&2; exit 1; }
+echo "    最新版本: $TAG"
+
+echo "==> 4/6 下载并安装二进制"
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+URL="https://github.com/sigoden/dufs/releases/download/${TAG}/dufs-${TAG}-${TARGET}.tar.gz"
+echo "    $URL"
+curl -fL --retry 3 --connect-timeout 15 -o "$TMP/dufs.tar.gz" "$URL"
+tar -xzf "$TMP/dufs.tar.gz" -C "$TMP"
+install -m 0755 "$TMP/dufs" "$DUFS_BIN"
+"$DUFS_BIN" --version
+
+echo "==> 5/6 创建运行用户与存储目录"
+if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
+  NOLOGIN="$(command -v nologin || echo /bin/false)"
+  useradd --system --no-create-home --shell "$NOLOGIN" --home-dir "$DATA_DIR" "$SERVICE_USER"
+fi
+mkdir -p "$DATA_DIR"
+chown -R "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR"
+chmod 750 "$DATA_DIR"
+
+echo "==> 6/6 写入 systemd 服务并启动"
+cat > "$UNIT_FILE" <<'EOF'
+[Unit]
+Description=dufs file server (local only, behind Nginx /files)
+After=network.target
+
+[Service]
+Type=simple
+User=dufs
+Group=dufs
+WorkingDirectory=/srv/cloud
+ExecStart=/usr/local/bin/dufs /srv/cloud \
+    --bind 127.0.0.1 --port 5000 \
+    --allow-all \
+    --path-prefix /files \
+    --auth 'admin:YOUR_PASSWORD_HERE@/:rw'
+Restart=always
+RestartSec=2
+LimitNOFILE=65535
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/cloud
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+chmod 600 "$UNIT_FILE"
+systemctl daemon-reload
+systemctl enable --now dufs
+
+echo "==> 完成。自检："
+sleep 1
+systemctl --no-pager --lines=8 status dufs || true
+(ss -lntp 2>/dev/null || netstat -lntp) | grep -E '127\.0\.0\.1:5000' \
+  && echo "OK: 5000 只在 127.0.0.1 监听" || echo "警告: 未见 5000 监听"
+curl -sS -o /dev/null -w 'localhost 直连返回: %{http_code}\n' http://127.0.0.1:5000/files/ || true
+OUTER_SCRIPT
+
+bash /tmp/install-dufs.sh
+```
+
+脚本逐段说明：
+
+| 步骤 | 为什么这么做 |
+|---|---|
+| 架构判断 | `uname -m` 映射到 dufs 的 release 名字；选 **musl** 版本，静态链接，不依赖服务器 glibc 版本，老系统也不会报 `GLIBC_2.xx not found` |
+| 版本查询 | 用 `curl -I` 跟随 `/releases/latest` 的重定向读 `url_effective`，比 GitHub API 更不容易被限流 |
+| `install -m 0755` | 一步完成复制 + 权限，比 `mv` + `chmod` 少一次踩坑 |
+| 独立系统用户 | dufs 以 `dufs` 用户运行，只对 `/srv/cloud` 有读写权；即使进程被攻破也拿不到系统其他目录 |
+| `ProtectSystem=strict` + `ReadWritePaths` | systemd 把整个文件系统挂成只读，只放开 `/srv/cloud`，是 dufs 这类网络服务最划算的加固 |
+
+成功标志：`Active: active (running)`、`OK: 5000 只在 127.0.0.1 监听`，以及直连返回 **401**（开了认证，不带凭据当然是未授权，这是正常的）。
+
+如果服务器在国内、从 GitHub 拉二进制超时，就在本地下载对应架构的 `dufs-<版本>-<架构>-unknown-linux-musl.tar.gz`，`scp` 上去解压，把里面的 `dufs` 放进 `/usr/local/bin` 再赋予 `0755`，后面的步骤照旧。
+
+## 六、设置真实密码
+
+密码直接写在 unit 里，所以先把占位符换掉再重启：
+
+```bash
+nano /etc/systemd/system/dufs.service
+# 把 --auth 'admin:YOUR_PASSWORD_HERE@/:rw' 改成你的密码
+systemctl daemon-reload && systemctl restart dufs
+
+# 验证凭据（dufs 用 Digest 认证，必须带 --digest）
+curl -I --digest -u admin:你的密码 http://127.0.0.1:5000/files/
+```
+
+返回 `HTTP/1.1 200 OK` 就说明账号密码生效。密码里**不要用单引号**（会截断 systemd 的引号）和 `%`（systemd 的变量转义符，必须写成 `%%`）；字母数字加 `_`、`-` 最省事。
+
+由于密码以明文存在 unit 文件里，`chmod 600` 别忘，`systemctl cat dufs` 也只有 root 能看。
+
+## 七、Nginx 反向代理
+
+把 `location` 加进**博客域名 `listen 443 ssl` 的那个 `server` 块**里（不是 80 跳转块），放在原有 `location /` 之前：
+
+```nginx
+location ^~ /files {
+    proxy_pass http://127.0.0.1:5000;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # 大文件上传：不限体积，边传边转不落盘
+    client_max_body_size 0;
+    proxy_request_buffering off;
+
+    # 大文件下载：不在本地缓冲，超时放宽
+    proxy_buffering off;
+    proxy_max_temp_file_size 0;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    send_timeout 3600s;
+
+    proxy_redirect off;
+}
+```
+
+逐条对坑：
+
+| 配置 | 作用 |
+|---|---|
+| `location ^~ /files` | `^~` 是「前缀匹配且优先于正则」，保证 `/files` 不会被 `location ~* \.(js\|css)$` 这类正则抢走，同时不影响 `/static/`、`/program/` 等博客路由 |
+| `proxy_pass` **不带 URI** | 写成 `http://127.0.0.1:5000/`（带斜杠）会把 `/files/a.zip` 改写成 `/a.zip`，dufs 开了 `--path-prefix /files` 后对不上，直接 404 |
+| `client_max_body_size 0` | 0 表示不限制；写在 location 里可覆盖 http/server 级别的默认 1M |
+| `proxy_request_buffering off` | 关掉请求体先收完再转发的行为，大文件直接流式传给 dufs，省磁盘也省等待（需 nginx ≥ 1.7.11） |
+| `proxy_buffering off` | 下载时不把响应攒在 Nginx 临时文件里 |
+| 三个 timeout | 几十 GB 的传输和慢速客户端不至于被 60s 默认超时掐断 |
+
+生效前先验语法：
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+## 八、验收
+
+```bash
+curl -I http://127.0.0.1:5000/files/       # dufs 本体，应 401
+curl -I https://wanjc.top/files/           # 经 Nginx，应 401
+curl -I https://wanjc.top/                 # 博客首页，应 200
+```
+
+然后无痕窗口访问 `https://wanjc.top`：
+
+1. 导航栏出现「云盘」，点击后**整页**跳到 `/files`（不是局部刷新）；
+2. 弹出账号密码框，取消则显示未授权；
+3. 登录后拖一个几十 MB 的文件上传、重命名、下载、打包下载、删除各试一次。
+
+## 九、常见问题
+
+| 现象 | 原因与处理 |
+|---|---|
+| 直连返回 401 | 正常，开了认证。要判断凭据对不对请加 `--digest -u` |
+| 502 Bad Gateway | 后端没起来，`journalctl -u dufs -n 50` 先看；CentOS/Rocky/AlmaLinux 还要 `setsebool -P httpd_can_network_connect 1` 放行 SELinux |
+| 上传报 413 | `client_max_body_size` 没生效，多半是加到了 80 跳转块或另一个 `server` 里 |
+| 大文件传到一半中断 | 缺 `proxy_request_buffering off` 或 timeout 太短 |
+| 打开 /files 没弹登录框、匿名就能上传 | `--allow-all` 会同时放宽**匿名用户**的默认权限，认证规则挡不住；自用场景可以去掉 `-A`，只留 `--auth admin:xxx@/:rw`，此时匿名只读 |
+| 点「云盘」页面嵌进了博客 | 链接漏了 `data-pjax="false"`，被 PJAX 接管了 |
+| 上面 `grep wanjc.top /etc/nginx/` 找不到配置 | 用了宝塔/1Panel，配置在面板目录；用 `nginx -T \| grep "configuration file"` 列出实际加载的所有文件 |
+
+## 十、日常维护
+
+```bash
+journalctl -u dufs -f                      # 实时日志
+systemctl status dufs                      # 运行状态
+nano /etc/systemd/system/dufs.service      # 改密码/调整参数
+systemctl daemon-reload && systemctl restart dufs
+tar -czf /root/cloud-$(date +%F).tar.gz -C /srv cloud   # 备份网盘数据
+```
+
+数据全在 `/srv/cloud`，属主是 `dufs` 用户，迁移机器时把这个目录连同 unit 文件一起带走即可。
+
+## 小结
+
+整个方案没有引入数据库、容器和额外端口：**dufs 一个二进制守住回环地址，Nginx 一段 location 把它挂到博客子路径，本地模板加一行带 `data-pjax="false"` 的链接**。静态博客和网盘互不干扰，Git 仓库也依旧只有纯 Lektor 代码。

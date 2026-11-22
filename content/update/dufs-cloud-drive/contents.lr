@@ -1,0 +1,138 @@
+title: 给博客加了私人网盘（dufs + Nginx 反代 /files）
+---
+summary: 需求是在博客域名下挂一个私有文件网盘。仓库保持纯 Lektor 只加了导航入口，服务器上用单个 dufs 二进制监听 127.0.0.1:5000，Nginx 用 location ^~ /files 反代并放开大文件上传，systemd 托管开机自启。
+---
+pub_date: 2026-11-23
+---
+author: jcw
+---
+body:
+
+#### text-block ####
+text:
+
+> 项目路径：`f:\program\blog\lektor-website`
+> 部署链路：本地 Lektor 构建 -> GitHub Actions SSH 推送 -> 云服务器 `/var/www/wanjc.top` -> Nginx 对外。
+
+## 一、需求
+
+博客是纯静态站，一直缺个放文件的地方：截图、压缩包、临时分享的大文件，要么塞进 Git 仓库（体积和隐私都不合适），要么丢第三方网盘（限速、广告、链接过期）。希望：
+
+1. 复用现有域名，路径就是 `https://wanjc.top/files`，不新开端口、不加证书；
+2. 浏览器里能拖拽上传、在线预览、打包下载；
+3. 有账号密码，只有自己能进，匿名看不到文件列表；
+4. 后端只跑在服务器本机，外网绝对摸不到 5000 端口；
+5. 大文件（几百 MB）上传下载不中断，博客本身不受任何影响。
+
+## 二、方案
+
+后端选了 `sigoden/dufs`：单个 Rust 静态二进制，自带 Web UI、上传下载、路径级权限和 Digest 认证，不需要数据库和运行时。落地结构：
+
+```text
+浏览器 --https--> Nginx (443)
+                    |-- location /         --> /var/www/wanjc.top   静态博客
+                    |-- location ^~ /files --> 127.0.0.1:5000       dufs
+                                                 |-- /srv/cloud     文件存储
+```
+
+分工很清晰：**本地仓库只管一个导航链接，其余全部是服务器侧配置**（仓库里没有 nginx.conf/Dockerfile，工作流只做静态文件同步，所以服务器改动不落仓库）。
+
+## 三、本地改动
+
+`templates/layout.html`，导航 `<ul id="pjax-nav">` 的菜单循环之后加一项：
+
+```html
+<li><a href="/files" data-pjax="false">云盘</a></li>
+```
+
+两个刻意的选择：
+
+- **不用 `|url` 过滤器**：`/files` 不是 Lektor 内容页，没有对应 page，走过滤器会在 `url_style = relative` 下被解析成相对路径，写死绝对路径最稳（站点就在域名根）。
+- **`data-pjax="false"` 必须加**：本站有 PJAX 局部跳转，不加的话点击会把 dufs 的整页 HTML 拉进 `#pjax-container`，博客页面里嵌一个网盘，样式和交互全废。`assets/js/pjax.js` 的选择器里有 `:not([data-pjax="false"])`，加上就退回原生整页跳转。
+
+## 四、服务器侧实现
+
+### 1. 安装 dufs
+
+脚本按 `uname -m` 映射到 release 名（x86_64 / aarch64 / armv7），优先取 **musl 静态版**（不依赖 glibc，老系统不会报 `GLIBC_2.xx not found`），版本号由 `/releases/latest` 的重定向地址解析（比 GitHub API 更不易被限流），`install -m 0755` 直接落到 `/usr/local/bin/dufs`。
+
+接着建系统用户 `dufs` 与目录 `/srv/cloud`（`chown dufs:dufs`、`chmod 750`），服务以该用户运行，只对这个目录有写权限。
+
+### 2. systemd 单元
+
+```ini
+ExecStart=/usr/local/bin/dufs /srv/cloud \
+    --bind 127.0.0.1 --port 5000 \
+    --allow-all \
+    --path-prefix /files \
+    --auth 'admin:YOUR_PASSWORD_HERE@/:rw'
+```
+
+- `--bind 127.0.0.1`：外网不可达，安全组也不放行 5000，唯一入口是 Nginx；
+- `--path-prefix /files`：dufs 生成的所有链接自带 `/files`，与反代路径对齐；
+- `Restart=always` 开机自启 + 崩溃自拉起；
+- 加固开满了：`NoNewPrivileges`、`PrivateTmp`、`ProtectSystem=strict`、`ProtectHome`，再用 `ReadWritePaths=/srv/cloud` 单独放开数据目录。
+
+因为密码写在 ExecStart 里，unit 文件 `chmod 600`，`systemctl cat` 只给 root 看。
+
+### 3. Nginx 反代
+
+```nginx
+location ^~ /files {
+    proxy_pass http://127.0.0.1:5000;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    client_max_body_size 0;
+    proxy_request_buffering off;
+
+    proxy_buffering off;
+    proxy_max_temp_file_size 0;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    send_timeout 3600s;
+
+    proxy_redirect off;
+}
+```
+
+`nginx -t && systemctl reload nginx` 生效。
+
+## 五、踩过的坑
+
+| 坑 | 说明 |
+|---|---|
+| `proxy_pass` 带尾斜杠 | 写成 `http://127.0.0.1:5000/` 会把 `/files/a.zip` 改写成 `/a.zip`，配合 `--path-prefix /files` 必然 404 |
+| 加错 server 块 | 域名配置常有 `listen 80`（跳转）和 `listen 443 ssl` 两个块，必须加在 443 那个里面 |
+| 直连 401 以为失败 | 开了认证，不带凭据就是未授权；验密码要 `curl -I --digest -u admin:密码 ...` |
+| 上传 413 | `client_max_body_size 0` 写到 80 块或别的 server 里了 |
+| 大文件传到一半断 | 少了 `proxy_request_buffering off`，或 timeout 默认 60s 太短 |
+| 匿名也能上传 | `--allow-all` 会放宽匿名用户默认权限；纯自用可直接删掉 `-A`，只留 `--auth` 规则 |
+| 502 且是 RHEL 系 | SELinux 拦了本机端口转发：`setsebool -P httpd_can_network_connect 1` |
+| GitHub 下载超时 | 本地下载对应架构压缩包，`scp` 上去解压到 `/usr/local/bin/dufs` + `chmod 755` |
+| 面板环境找不到配置 | 宝塔/1Panel 在 `/www/server/panel/vhost/nginx/`，或用 `nginx -T \| grep "configuration file"` 反查 |
+
+## 六、验收结果
+
+- `curl -I http://127.0.0.1:5000/files/` -> 401（后端只在回环，认证生效）
+- `curl -I https://wanjc.top/files/` -> 401（反代链路通）
+- `curl -I https://wanjc.top/` -> 200（博客静态资源、文章、图片全部正常）
+- 无痕窗口点「云盘」：弹出登录框，登录后上传/重命名/打包下载/删除全部可用，博客与网盘互不干扰。
+
+## 七、维护备忘
+
+```bash
+journalctl -u dufs -f                                    # 日志
+systemctl status dufs                                    # 状态
+nano /etc/systemd/system/dufs.service                    # 改密码
+systemctl daemon-reload && systemctl restart dufs        # 重载
+tar -czf /root/cloud-$(date +%F).tar.gz -C /srv cloud    # 备份数据
+```
+
+数据全部在 `/srv/cloud`，迁移时连同 `dufs.service` 一起带走即可。
+
+> 详细的分步教程（脚本逐段解释、参数对照表、完整排错流程）见编程专栏里的《用 dufs 给静态博客加一个私人网盘（Nginx 反代 /files）》。
