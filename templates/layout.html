@@ -30,6 +30,11 @@
             <li{% if this.is_child_of(item.path) %} class="active"{% endif
               %}><a href="{{ item.path|url }}">{{ item.label }}</a></li>
           {% endfor %}
+          {# 云盘：由服务器 Nginx 反代到本地 dufs（127.0.0.1:5000）。
+             这里写死绝对路径 /files（站点部署在域名根目录，不走 Lektor 的内容解析）。
+             data-pjax="false" 让点击走浏览器原生整页跳转，否则 PJAX 会把 dufs 的页面
+             塞进 #pjax-container 里，外观和功能都会错乱。 #}
+          <li><a href="/files" data-pjax="false">云盘</a></li>
         </ul>
       </div>
     </div>
