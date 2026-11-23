@@ -1,0 +1,273 @@
+_model: section-page
+---
+title: NEU-DET 钢材缺陷检测复盘：从 VOC 标注到 YOLO 训练与 Ghost 轻量化
+---
+category: 深度学习
+---
+root_path: /program/
+---
+pub_date: 2026-11-23
+---
+author: jcw
+---
+body:
+
+> 本文复盘我在 NEU-DET 钢材表面缺陷数据集上的完整实践：把 VOC/XML 标注转成 YOLO 格式、做 1200/300/300 的数据划分、用 CLAHE 增强弱纹理，然后基于 Ultralytics 跑通 YOLOv8n、YOLO11n、YOLO11n+CLAHE 与 YOLOv8n-Ghost 共 6 组实验，并给出每组训练结果和踩坑记录。
+
+------
+
+## 一、 数据集与任务
+
+NEU-DET 是钢材表面缺陷检测数据集，共 **6 类缺陷**：
+
+| id | 类别 | 含义 |
+| :--- | :--- | :--- |
+| 0 | crazing | 裂纹 |
+| 1 | patches | 斑块 |
+| 2 | inclusion | 夹杂 |
+| 3 | pitted_surface | 点蚀表面 |
+| 4 | rolled-in_scale | 轧入氧化皮 |
+| 5 | scratches | 划痕 |
+
+原始数据是 1,500 张训练图 + 300 张测试图，VOC 格式的 XML 标注。遍历所有 XML 得到 **4,189 个缺陷框**，按类统计如下：
+
+| 类别 | crazing | patches | inclusion | pitted_surface | rolled-in_scale | scratches |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 框数 | 689 | 881 | 1,011 | 432 | 628 | 548 |
+
+类别分布不算极端失衡，但 crazing 和 rolled-in_scale 明显偏少，而且它们的纹理与背景最相似——这一点在后面的结果分析里会成为主要瓶颈。
+
+------
+
+## 二、 整体流程 Pipeline
+
+```text
+NEU-DET 原始目录 (1500 train + 300 test, VOC XML)
+   │
+   ▼
+[data.ipynb]
+   ├─ 遍历 XML 统计 6 类框数 -> 类别映射 crazing:0 ... scratches:5
+   ├─ VOC [xmin,ymin,xmax,ymax] -> YOLO [cx,cy,w,h] 归一化, 过滤 difficult=1
+   ├─ 写 NEU-DET.yaml (path=/workspace/NEU-DET, 6 类)
+   ├─ 从 train 中按 seed=42 划 300 对到 val -> 1200/300/300
+   └─ CLAHE: 只处理 L 通道, 1800 张 -> NEU-DET-CLAHE
+   │
+   ▼
+[6 组 Ultralytics 训练] 150 epoch / batch 32 / imgsz 640 / AdamW / Tesla T4
+   ├─ v8n 基线        -> v8s_standard_run
+   ├─ v11n 基线       -> v11n_run
+   ├─ v11n + CLAHE    -> v11n_CLAHE_run
+   ├─ v11n small      -> v11n_small_run        (train/val 写反)
+   ├─ v11n CLAHE small-> v11n_CLAHE_small_run  (train/val 写反)
+   └─ v8n-Ghost       -> v8n_ghost_run         (最优)
+   │
+   ▼
+[结果产物] results.csv / 训练曲线 / PR 曲线 / 混淆矩阵 / val_batch 预测对比
+```
+
+------
+
+## 三、 关键数据转换
+
+### 3.1 VOC XML → YOLO txt
+
+核心在 `data.ipynb` 的 `convert_coordinates()`：用图像的 `<size>` 宽高把绝对坐标转成归一化中心坐标，并 `clamp` 到 `[0, 1]`；同时**过滤掉 `difficult=1` 的框**，最后按 `class_id cx cy w h` 六位小数写到同名 `.txt`。
+
+```python
+dw = 1.0 / width
+dh = 1.0 / height
+x_center = (xmin + xmax) / 2.0 * dw
+y_center = (ymin + ymax) / 2.0 * dh
+box_w = (xmax - xmin) * dw
+box_h = (ymax - ymin) * dh
+# 写入: f"{class_id} {x_center:.6f} {y_center:.6f} {box_w:.6f} {box_h:.6f}"
+```
+
+转换结果：1,500 个 train XML → `labels/train`，300 个 test XML → `labels/test`。
+
+### 3.2 划分 train / val
+
+原 test 保持不动，从 train 里用 `random.seed(42)` shuffle 后**移动 300 对图片+标签**到 `images/val` 与 `labels/val`：
+
+- train：1,200 张（约 2,762 个实例）
+- val：300 张（约 669 个实例）
+- test：300 张（约 758 个实例）
+
+代码里带“val 非空则跳过”的保护，避免重复执行时再次移动数据。Ultralytics 自动生成的标签分布图能直观看到各类数量和框的位置/尺寸分布：
+
+![训练标签分布](/images/neu-det/labels_distribution.jpg)
+
+### 3.3 CLAHE：增强弱纹理
+
+钢材表面光照不均，裂纹、氧化皮这类缺陷和背景对比度很低。所以又生成了一份 CLAHE 数据集（`data.ipynb` cell 8）：
+
+```python
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+# 彩色图转 LAB，只对 L 通道做均衡，再转回 BGR
+lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+l, a, b = cv2.split(lab)
+l = clahe.apply(l)
+img = cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2BGR)
+```
+
+处理时注意了两点：用 `cv2.imdecode(np.fromfile(...))` / `cv2.imencode(...).tofile()` 兼容中文路径；`labels/` 目录用 `shutil.copytree` 原样复制，标注不动。最终 **1,800/1,800 张**全部处理完成，目录结构与原数据集一致，训练时只需把 yaml 的 `path` 换成 `/workspace/NEU-DET-CLAHE`。
+
+效果后面会看到：mAP50 从 0.7103 提升到 0.7398，`rolled-in_scale` 的 AP50 从 0.547 抬到 0.616，说明局部对比度增强确实帮到了弱纹理类别。
+
+------
+
+## 四、 训练配置与六组实验
+
+六组实验共用同一套超参（见任一 run 的 `args.yaml`）：
+
+| 参数 | 值 | 参数 | 值 |
+| :--- | :--- | :--- | :--- |
+| epochs | 150 | batch | 32 |
+| imgsz | 640 | device | 0（Tesla T4） |
+| optimizer | AdamW | lr0 / lrf | 0.01 / 0.01 |
+| momentum | 0.937 | weight_decay | 0.0005 |
+| warmup_epochs | 3 | amp | True |
+| close_mosaic | 10 | seed / deterministic | 0 / True |
+| hsv_h/s/v | 0.015 / 0.7 / 0.4 | degrees / translate / scale | 10 / 0.1 / 0.5 |
+| fliplr / flipud | 0.5 / 0.5 | mosaic / mixup / copy_paste | 0.5 / 0.1 / 0.2 |
+
+### 4.1 六组结果汇总
+
+指标取 `results.csv` 第 150 行（最后一轮），时间单位小时：
+
+| 实验 | 数据 | P | R | mAP50 | mAP50-95 | 耗时 | 参数量 |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| YOLOv8n 基线 | 原始 | 0.602 | 0.722 | 0.729 | 0.404 | 1.349 h | 3.01M |
+| YOLO11n 基线 | 原始 | 0.571 | 0.738 | 0.711 | 0.381 | 1.056 h | 2.58M |
+| YOLO11n + CLAHE | CLAHE | 0.637 | 0.702 | 0.738 | 0.389 | 1.386 h | 2.58M |
+| YOLO11n small | 路径写反 | 0.733 | 0.521 | 0.630 | 0.278 | 0.824 h | 2.58M |
+| YOLO11n CLAHE small | 路径写反 | 0.585 | 0.602 | 0.615 | 0.250 | 0.895 h | 2.58M |
+| **YOLOv8n-Ghost** | 原始 | **0.642** | **0.734** | **0.744** | **0.423** | **0.678 h** | **1.72M** |
+
+结论很清晰：
+
+- 换 YOLO11n 反而略降（0.405 → 0.381），说明“新版本就一定更好”并不成立；
+- CLAHE 让 YOLO11n 回升到 0.389，且精度略高于 v8n 基线；
+- **Ghost 轻量化是综合最优**：精度最高、速度最快、参数最少；
+- 两个 small 实验的指标不能和上面公平比较，原因见第 4.2 节。
+
+最佳实验 `v8n_ghost_run` 的训练曲线如下，loss 平稳下降、mAP 逐步收敛：
+
+![YOLOv8n-Ghost 训练曲线](/images/neu-det/ghost_results.png)
+
+### 4.2 small 实验的坑：train / val 写反了
+
+`NEU-DET-small.yaml` 和 `NEU-DET-CLAHE-small.yaml` 里少写成了：
+
+```yaml
+train: images/val
+val: images/train
+```
+
+训练日志实证：`train: Scanning .../labels/val.cache... 300 images`，`val: Scanning .../labels/train.cache... 1200 images`。也就是说：
+
+1. 实际只用 **300 张**训练，召回率明显偏低（0.52 vs 基线 0.74）；
+2. 验证用 1,200 张，而且**这 1,200 张里包含了训练用的 300 张**，属于数据泄漏；
+3. 指标表面上看 mAP50 有 0.63，但口径完全不同，不能当作小样本性能结论。
+
+注释里还写着“训练集（剩余的 80%）”，与代码自相矛盾——这是写代码时改路径忘了同步注释的典型情况。
+
+------
+
+## 五、 结果分析
+
+### 5.1 分类别 AP
+
+六组实验的各类 AP50 / AP50-95 中，挑最有代表性的四组：
+
+| 类别 | YOLOv8n | YOLO11n | YOLO11n+CLAHE | YOLOv8n-Ghost |
+| :--- | :--- | :--- | :--- | :--- |
+| crazing | 0.400 / 0.129 | 0.411 / 0.144 | 0.409 / 0.150 | 0.410 / 0.152 |
+| patches | 0.903 / 0.579 | 0.874 / 0.572 | 0.906 / 0.562 | 0.898 / 0.582 |
+| inclusion | 0.829 / 0.466 | 0.804 / 0.463 | 0.836 / 0.464 | 0.851 / 0.503 |
+| pitted_surface | 0.803 / 0.506 | 0.751 / 0.405 | 0.801 / 0.467 | 0.800 / 0.503 |
+| rolled-in_scale | 0.567 / 0.275 | 0.547 / 0.252 | 0.616 / 0.259 | 0.600 / 0.275 |
+| scratches | 0.870 / 0.474 | 0.871 / 0.450 | 0.870 / 0.457 | 0.889 / 0.525 |
+
+几个规律：
+
+- **crazing 是所有实验的短板**，AP50 只有 0.40 左右，归一化混淆矩阵里它被判成 background 的比例高达 **0.78**；
+- patches、scratches、inclusion 都在 0.83 以上，属于“容易类”；
+- CLAHE 对 rolled-in_scale 提升最明显（0.547 → 0.616）；
+- Ghost 在 inclusion 和 scratches 上 AP50-95 最高，说明轻量化没有牺牲细粒度定位能力。
+
+![YOLOv8n-Ghost PR 曲线](/images/neu-det/ghost_pr_curve.png)
+
+![归一化混淆矩阵](/images/neu-det/ghost_confusion_normalized.png)
+
+### 5.2 可视化核对
+
+把验证集前 3 个 batch 的真值框和预测框并排看，能直观看到 defects 的定位质量，也能发现划痕类存在一定漏检/误检：
+
+- 真值：
+
+![验证集真值框](/images/neu-det/ghost_val_labels.jpg)
+
+- 预测：
+
+![验证集预测框](/images/neu-det/ghost_val_pred.jpg)
+
+训练初期的 batch 拼图则展示了 Mosaic、HSV、翻转等增强叠加后的样本形态：
+
+![训练增强 batch](/images/neu-det/ghost_train_batch.jpg)
+
+------
+
+## 六、 Ghost 轻量化做了什么
+
+Ghost 分支没有手写网络代码，而是直接用了 Ultralytics 内置的 `yolov8n-ghost.yaml`（项目目录里没有该文件，依赖本机安装的 8.4.60 版本）：
+
+```python
+model = YOLO('yolov8n-ghost.yaml')
+model.load('yolov8n.pt')
+```
+
+结构上的变化从训练日志能看清：
+
+- backbone 的常规 `Conv` 换成了 `GhostConv`（层 1/3/5/7/16/19）；
+- `C3` 块换成了 `C3Ghost`（层 2/4/6/8/12/15/18/21）；
+- Neck 同样替换，检测头 `Detect` 和 `SPPF` 保留。
+
+规模与收益：
+
+| 指标 | YOLOv8n | YOLOv8n-Ghost | 变化 |
+| :--- | ---: | ---: | :--- |
+| 参数量 | 3,006,818 | 1,715,246 | **−43%** |
+| GFLOPs | 8.1 | 5.0 | **−38%** |
+| 权重大小 | 约 5.98 MB | 3.59 MB | −40% |
+| mAP50-95 | 0.4052 | 0.4238 | **+0.019** |
+| 训练耗时 | 1.349 h | 0.678 h | 约一半 |
+
+也就是说，换 Ghost 之后**更小、更快、还更准**。代价是预训练权重只能部分迁移（初始化时 `Transferred 119/559`，覆盖类别数后 `523/559`），且配置文件不在仓库内，复现依赖环境版本。
+
+------
+
+## 七、 赛后复盘与可优化方向
+
+1. **先检查 yaml，再开始训练**
+   small 实验的 train/val 写反是最昂贵的错误：4 组实验里有 2 组口径失效。建议训练前先打印 dataloader 扫描到的图片数，和预期对不上就立刻停。
+
+2. **不要用 test 当 val**
+   `data.ipynb` cell 6 生成的 `neu_det.yaml` 曾把 `val` 写成 `images/test`，虽然后续训练用的是修正后的 `NEU-DET.yaml`，但这个痕迹说明存在测试集参与选模的风险。最终汇报应补一次独立 test 评估。
+
+3. **命名与路径要可复现**
+   `v8s_standard_run` 名字带 s，实际用的是 `yolov8n.yaml`；所有 yaml 硬编码 `/workspace/...`，预处理却在 Windows 中文路径下完成。应统一相对路径配置，并把 `yolov8n-ghost.yaml` 显式存进仓库。
+
+4. **crazing 是真正的瓶颈**
+   它纹理细、对比度低，在所有实验里 AP 最低。可以针对这一类做重采样/损失加权，或者提高输入分辨率到 768/960；单纯换模型版本收益有限。
+
+5. **两条改进路线还没交叉**
+   CLAHE 和 Ghost 分别验证有效，但没做过“Ghost + CLAHE”的组合实验，这是最直接的下一步。
+
+6. **重复实验与早停**
+   所有 notebook 都设了 `exist_ok=True` 且 run 名固定，重跑会覆盖旧结果；也没有多随机种子。建议改成时间戳 run 名，`patience` 调小，并做 3 次重复取均值±方差。
+
+7. **标注质量**
+   日志里出现过 `1 duplicate labels removed`（如 `crazing_120.jpg`、`inclusion_62.jpg`），说明有重复标注；另外 3 张 small 实验里的 crazing 甚至出现 P=1、R=0 的极端情况，值得回头查标注。
+
+总的来看，这次最有价值的不是某个 mAP 数字，而是把“数据格式转换 → 划分 → 预处理对照 → 模型版本对照 → 轻量化对照”这一整套对照实验跑成了可复盘的流水线。Ghost 用 43% 的参数换来更高的精度，也说明在这个规模的数据集上，**结构轻量化比盲目换大模型更划算**。

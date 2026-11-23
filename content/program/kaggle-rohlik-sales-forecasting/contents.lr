@@ -1,0 +1,282 @@
+_model: section-page
+---
+title: Kaggle 实战复盘：Rohlik 商品销量预测（Top 43%，338/777）
+---
+category: 机器学习
+---
+root_path: /program/
+---
+pub_date: 2026-11-23
+---
+author: jcw
+---
+body:
+
+> 本文复盘我在 Kaggle **Rohlik Sales Forecasting Challenge** 中的完整解题思路、特征工程演进、多模型实验对比与赛后反思。最终方案基于交叉目标编码（Target Encoding）与 LightGBM 模型，在 777 支参赛队伍中取得第 338 名的成绩。
+
+------
+
+## 一、 赛题背景与数据理解
+
+### 1.1 任务目标
+本赛题需要根据欧洲生鲜电商平台 Rohlik 提供的历史商品销售数据、日历信息及商品库存属性，预测未来两周（**2024-06-03 至 2024-06-16**）各仓库下具体商品（`unique_id`）的每日销量（`sales`）。
+
+最终提交格式为 `id`（由 `{unique_id}_{date}` 拼接而成）与预测值 `sales_hat`。
+
+### 1.2 数据集构成
+比赛共包含 4 张核心数据表：
+- **`sales_train.csv` / `sales_test.csv`**：主表，记录商品每日销量、仓库（`warehouse`）、总订单量（`total_orders`）、售价（`sell_price_main`）以及 7 种类型的折扣信息（`type_0_discount` ~ `type_6_discount`）。训练集额外包含 `availability` 字段，但测试集中没有该列。
+- **`calendar.csv`**：日历与节假日辅助表，包含各仓库对应日期的节假日名称（`holiday_name`）、是否节假日（`holiday`）、是否闭店（`shops_closed`）、学校假期（`school_holidays`、`winter_school_holidays`）等特征。
+- **`inventory.csv`**：商品属性表，包含商品编号（`product_unique_id`）、商品名称（`name`）以及四级英文品类标签（`L1_category_name_en` ~ `L4_category_name_en`）。
+
+------
+
+## 二、 整体技术方案 Pipeline
+
+整个建模与实验迭代流程可以概括为以下链路：
+
+```text
+原始多表 (sales + calendar + inventory)
+   │
+   ▼
+[数据清洗与融合] 剔除缺失与测试集无用列 -> 节假日缺失填充 -> 三表左连接合并
+   │
+   ▼
+[EDA 探索性分析] 仓库销量时序周期性 -> 订单/价格相关性 -> 长尾分布洞察
+   │
+   ▼
+[特征工程迭代] 
+   ├─ 时间三角周期编码 (month/day -> sin/cos) + 年份离散化
+   ├─ 折扣稀疏列浓缩 (type_0~6 -> is_discount + max_discount)
+   └─ 高基数类别编码实验：One-Hot -> 均值编码 -> log1p平滑 -> 交叉统计编码
+   │
+   ▼
+[验证与模型对比] 双窗口局部验证 (去年同期 + 近期一个月)
+   ├─ Random Forest (Baseline)
+   ├─ XGBoost (Hist + GPU)
+   └─ LightGBM (最终选型与全量训练)
+   │
+   ▼
+[推理与提交] 生成 submission4.csv ({unique_id}_{date}, sales_hat)
+```
+
+------
+
+## 三、 数据清洗与多表融合
+
+在正式构建特征前，先针对原始数据做了对齐与基础清洗：
+
+1. **训练集对齐与缺失处理**：
+   - 检查发现训练集存在 `total_orders` 等字段整天缺失的情况（推测为闭店或特殊节假日导致），直接通过 `dropna()` 剔除。
+   - 由于 `sales_test.csv` 中不包含 `availability` 列，直接从训练集中删除该列以保持特征空间一致。
+   - 检查确认不存在 `sales < 0` 的异常负销量样本。
+2. **日历表缺失填充**：
+   - `calendar['holiday_name']` 存在大量空值，实际上对应非节假日的普通工作日/周末。将其统一填充为 `'week'` 归为一类，保留完整的节假日维度信息。
+3. **三表 Left Join 与类型规范**：
+   - 先按 `['date', 'warehouse']` 关联 `calendar`，再按 `['unique_id', 'warehouse']` 关联 `inventory`。
+   - 将 `holiday`、`shops_closed`、`winter_school_holidays`、`school_holidays` 等标志位由整型转为严格的 `bool` 类型。
+
+核心融合代码如下：
+
+```python
+# 1. 剔除缺失值与测试集不存在的列
+train = train.dropna().drop(columns=['availability'])
+
+# 2. 填充普通日期的节假日名称
+calendar['holiday_name'].fillna('week', inplace=True)
+
+# 3. 关联日历与商品属性表
+train = pd.merge(train, calendar, on=['date', 'warehouse'], how='left')
+test = pd.merge(test, calendar, on=['date', 'warehouse'], how='left')
+
+train = pd.merge(train, inventory, on=['unique_id', 'warehouse'], how='left')
+test = pd.merge(test, inventory, on=['unique_id', 'warehouse'], how='left')
+
+# 4. 布尔类型转换
+bools_col = ['holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays']
+for df in [train, test]:
+    df[bools_col] = df[bools_col].astype(bool)
+```
+
+------
+
+## 四、 探索性数据分析（EDA）与核心发现
+
+围绕时间、宏观指标与高基数类别，主要做了以下可视化探查：
+
+1. **强年度/季节周期性**：绘制各个 `warehouse`（如 `Budapest_1`）平均销量随时间变化的折线图，发现销量具有明显的跨年季节周期规律——这直接决定了后续**使用“去年 6 月同期数据”作为核心验证集之一**的策略。
+2. **年度宏观水位差异**：按年分组统计平均销量，发现 2020–2023 年整体均值偏低，2024 年存在波动，因此保留 `year` 作为类别特征（转为 `'year_2023'` 形式）来捕捉年份趋势。
+3. **数值相关性与散点分布**：绘制了全数值特征相关性热力图，并对比了 `total_orders`、`sell_price_main` 与 `sales` 随时间的散点变化关系，确认仓库订单总量对单品销量有极强的正向牵引作用。
+4. **节假日与品类的长尾效应**：分别按 `holiday_name`、`product_unique_id`、`L2_category_name_en`、`L3_category_name_en` 统计 `sales` 均值并绘制柱状图。结果显示不同节假日（可明显划分出高、中、低销量梯队）及不同商品/类目间的销量跨度极大，呈现出显著的**长尾分布**。
+
+对应的关键可视化如下。
+
+仓库维度的平均销量时序，可以清楚看到跨年的季节周期：
+
+![各仓库平均销量随时间变化](/images/rohlik/eda_warehouse_trend.png)
+
+按年份聚合后的平均销量，2020–2023 整体偏低、2024 年波动明显：
+
+![按年份统计的平均销量](/images/rohlik/eda_yearly_sales.png)
+
+数值特征相关性热力图与订单总量—销量散点图，`total_orders` 与 `sales` 的正向关系非常直观：
+
+![数值特征相关性热力图](/images/rohlik/eda_correlation_heatmap.png)
+
+![订单总量与销量的散点关系](/images/rohlik/eda_orders_sales_scatter.png)
+
+节假日、单品与品类的销量分布均呈现明显的长尾：
+
+![不同节假日的平均销量](/images/rohlik/eda_holiday_sales.png)
+
+![单品销量的长尾分布](/images/rohlik/eda_product_longtail.png)
+
+![L2 品类平均销量](/images/rohlik/eda_category_sales.png)
+
+------
+
+## 五、 特征工程：从基础构造到多轮编码迭代
+
+### 5.1 时间周期编码（Cyclic Encoding）
+为了让树模型或线性/距离敏感的预处理更好地感知月份和日期的连续循环关系（例如 12 月与 1 月相邻、月底与月初相邻），对 `month`（周期 12）和 `day`（周期 31）进行了正余弦三角函数转换，并丢弃原始 `month` 与 `day`。
+
+其中 `T` 为周期（`month` 取 12、`day` 取 31），`t` 为当前的月份或日期值：
+
+```text
+sin_feat = sin(2π · t / T)
+cos_feat = cos(2π · t / T)
+```
+
+```python
+for df in [train, test]:
+    df['date'] = pd.to_datetime(df['date'])
+    df['year'] = df['date'].dt.year.apply(lambda x: f'year_{x}')
+    month = df['date'].dt.month
+    day = df['date'].dt.day
+
+    df['month_sin'] = np.sin(2 * np.pi * month / 12)
+    df['month_cos'] = np.cos(2 * np.pi * month / 12)
+    df['day_sin'] = np.sin(2 * np.pi * day / 31)
+    df['day_cos'] = np.cos(2 * np.pi * day / 31)
+```
+
+月份与日期的三角编码曲线如下，可见相邻月份/日期在编码空间中自然靠近：
+
+![月份三角周期编码](/images/rohlik/cyclic_encoding_month.png)
+
+![日期三角周期编码](/images/rohlik/cyclic_encoding_day.png)
+
+### 5.2 折扣特征降维压缩
+原始数据包含 `type_0_discount` 至 `type_6_discount` 共 7 个稀疏折扣列，直接输入容易造成特征稀疏冗余。因此将其浓缩为两个物理意义更明确的强特征，随后删除原 7 列：
+- `is_discount`：当前商品当日是否存在任意折扣（`bool`）。
+- `max_discount`：所有折扣类型中的最高折扣力度（`float64`）。
+
+```python
+discount_columns = [f'type_{i}_discount' for i in range(7)]
+for df in [train_df, test_df]:
+    df['is_discount'] = df[discount_columns].apply(lambda row: 1 if row.any() else 0, axis=1).astype(bool)
+    df['max_discount'] = df[discount_columns].apply(lambda row: row.max(), axis=1).astype('float64')
+
+train_df.drop(columns=discount_columns, inplace=True)
+test_df.drop(columns=discount_columns, inplace=True)
+```
+
+### 5.3 高基数类别特征编码的四次迭代
+面对 `name`、`holiday_name` 以及 `L1`–`L4` 等多级高基数文本特征，我先后测试了四种处理策略：
+
+| 迭代版本 | 核心思路 | 优点与局限 |
+| :--- | :--- | :--- |
+| **V1：全量 One-Hot + MinMax** | 对所有类别直接 `get_dummies` 并做 `[0, 1]` 归一化 | 特征维度急剧膨胀，稀疏且计算开销大 |
+| **V2：基础目标编码 + 标准化** | 对 `year`, `name`, `holiday_name`, `L2~L4` 计算训练集 `sales` 均值并替换原列，连续特征做 `StandardScaler` | 有效压缩维度，但受长尾爆款商品影响，均值极值跨度较大 |
+| **V3：Log1p 平滑目标编码** | 在 V2 基础上，对各分组销量均值施加 `np.log1p` 变换，同时保留 `warehouse` 和 `L1` 做 One-Hot | 缓解了长尾极值对分布的拉伸，数值更平稳 |
+| **V4（最终采用）：细粒度交叉统计编码** | 从单一特征均值升级为**业务 + 时间交叉组合编码**，并对高冗余统计特征做消融筛选 | 更精细地刻画了“特定商品在特定日期/节假日/年份”的销量基线 |
+
+**最终采用的 V4 交叉编码构建细节**：
+1. **日期 × 实体交叉编码**：提取 `day`，分别计算 `(warehouse, day)` 和 `(name, day)` 的历史 `sales` 均值（`warehouse_day_mean`、`name_day_mean`），捕捉月末/月初等日期效应对不同仓库和单品的差异影响。
+2. **商品 × 年份交叉编码**：计算 `(name, year)` 组合的 `sales` 均值（`year_encoded`），反映商品在不同年份的热度迁移。
+3. **节假日 × 商品交叉编码**：计算 `(holiday_name, name)` 组合的 `sales` 均值（`holiday_name_encoded`），刻画不同商品在特定节假日的爆发差异（例如礼盒、生鲜在节日中的表现截然不同）。
+4. **品类均值 + 低基数 One-Hot**：对 `L1`–`L4` 保留分级销量均值，丢弃 `product_unique_id`、`name`、`holiday_name` 等原始高基数字符串，仅对剩余低基数类别做 One-Hot（`drop_first=True`），并对 `total_orders`、`sell_price_main` 做 `StandardScaler` 标准化。
+
+> 此外，在另外一组特征消融实验中，我还测试过基于 `weekday`、`is_weekend` 以及 `*_total_orders`、`*_weekday_sales_mean` 的全量聚合表，但在 LightGBM 验证中发现过多重复统计量并没有带来明显收益，反而容易过拟合，因此最终予以剔除。
+
+------
+
+## 六、 验证集设计与多模型对比
+
+### 6.1 双窗口局部验证策略（Local Validation）
+由于测试集要预测 **2024-06-03 至 2024-06-16** 共 14 天的销量，普通的随机 K-Fold 会破坏时间连续性。因此，我设计了**两个具有特定代表性的时间窗口拼接作为局部验证集**：
+1. **`val1`（同期季节窗口）：`2023-06-03` ~ `2023-06-16`** —— 完全对应去年同期的 14 天，检验模型对 6 月初季节性周期的拟合能力。
+2. **`val2`（近期趋势窗口）：`2024-05-03` ~ `2024-06-03`** —— 紧邻测试集前一个月的真实走势，检验模型对最新销量水位的跟踪能力。
+
+```python
+val1 = train[(train['date'] >= '2023-06-03') & (train['date'] <= '2023-06-16')]
+val2 = train[(train['date'] >= '2024-05-03') & (train['date'] <= '2024-06-03')]
+val = pd.concat([val1, val2])
+```
+
+### 6.2 多维度评估方式
+除了常规的全局 `MAE`、`MSE`、`R²` 外，我还针对长尾销量做了两项细粒度诊断：
+- **分位数区间 MAE 评估**：按真实销量的 33% 和 66% 分位数将验证集切分为低、中、高三个销量区间，分别计算 MAE，定位模型在长尾高销量商品上的误差表现。
+- **时序拟合可视化**：将 2023–2024 年训练集与 `val1`、`val2` 的真实值（`sales`）和预测值（`sales_hat`）绘制在同一张时序对比图中，直观检查趋势波峰波谷是否对齐。
+
+黄色实线为真实销量，红色虚线为预测销量。两个验证窗口的拟合对比如下：
+
+![验证集 val1 真实值与预测值对比](/images/rohlik/lgb_val1_true_vs_pred.png)
+
+![验证集 val2 真实值与预测值对比](/images/rohlik/lgb_val2_true_vs_pred.png)
+
+### 6.3 模型对比与最终提交配置
+在本地分别测试了三种树模型：
+1. **Random Forest**（`train_smooth_all.csv`）：`n_estimators=100`，作为基础树模型对照。
+2. **XGBoost**（分别测试 `train.csv` 与 `train_smooth_all.csv`）：开启 `tree_method='hist'` 与 CUDA 加速，`max_depth=20`、`learning_rate=0.015~0.02`、`max_bin=512`、`early_stopping_rounds=50`。
+3. **LightGBM**：一方面测试了直接把类别列转为 `category` dtype 的原生类别处理方式；另一方面结合 V4 交叉编码特征，以 **`metric='mae'`** 作为评估监控，最终使用如下超参数在全量训练集上训练 1000 轮并生成最终提交文件：
+
+特征重要性显示 `total_orders` 的贡献远高于其他特征，`month_sin`、`day_cos`、`day_sin` 次之，这也印证了 EDA 阶段关于宏观订单量与日历周期的判断：
+
+![LightGBM 特征重要性](/images/rohlik/lgb_feature_importance.png)
+
+```python
+params = {
+    'boosting_type': 'gbdt',
+    'objective': 'regression',
+    'metric': 'mae',
+    'num_leaves': 500,
+    'learning_rate': 0.08,
+    'feature_fraction': 0.8,
+    'bagging_fraction': 0.8,
+    'bagging_freq': 10,
+    'min_data_in_leaf': 5,
+    'lambda_l1': 1,
+    'lambda_l2': 0.5,
+    'device': 'gpu',
+    'seed': 42,
+    'verbose': -1
+}
+
+model = lgb.train(params, train_data, num_boost_round=1000)
+predictions = model.predict(X_val)
+
+submission_df = pd.DataFrame({
+    'id': [f"{unid}_{date}" for unid, date in zip(val_unid, val_date)],
+    'sales_hat': predictions
+})
+submission_df.to_csv('submission4.csv', index=False)
+```
+
+------
+
+## 七、 赛后复盘与可优化方向
+
+回看当时的代码与实验记录，有几个非常值得总结的工程教训与进阶优化空间：
+
+1. **目标编码（Target Encoding）的数据泄露风险**
+   - 当时直接使用了整个 `train_df` 计算 `groupby(...)[sales].mean()`，甚至在划出局部验证集之前就完成了均值映射。这会导致模型在训练和验证阶段一定程度上“偷看”到了目标分布（尤其是 `(name, year)`、`(holiday_name, name)` 这类较细粒度的交叉组合）。
+   - **改进方案**：应严格在交叉验证的每个 Fold 内部或按严格时间因果顺序（Expanding Window）计算目标均值，并引入贝叶斯平滑（`m-estimate` / Smoothing），避免小样本分组的均值过拟合。
+2. **时序验证的严格因果性**
+   - `val1` 位于 2023 年 6 月，而训练集同时包含了 `val1` 之后（2023 年下半年至 2024 年）的数据，存在“用未来数据预测过去”的轻微穿越问题。
+   - **改进方案**：采用严格的前向滚动时间窗口验证（Rolling Time-Series Split），保证训练数据的时间戳严格早于验证集。
+3. **引入时序滞后与滑动窗口特征（Lag & Rolling Features）**
+   - 当前特征体系偏向“静态属性 + 日历周期均值”，缺少商品自身的近期销量惯性特征。
+   - **改进方案**：由于测试窗口为未来 14 天，可以安全地构造 `lag >= 14` 天的历史销量滞后特征（如 `lag_14`、`lag_21`、`lag_28`）以及近 7/14/28 天滚动均值与标准差，同时补充“距离下一个节假日的天数 / 节后恢复天数”等日历上下文特征。
+4. **损失函数与比赛指标对齐**
+   - 代码中训练仍采用默认的 L2 回归目标（`regression`），面对长尾销量的异常高值容易受到平方误差牵引。后续可尝试直接使用 L1 损失（`objective='regression_l1'`）或结合比赛 WMAE 权重做样本加权，并与 XGBoost、CatBoost 进行加权融合（Ensemble）以进一步提升榜单名次。

@@ -1,0 +1,307 @@
+_model: section-page
+---
+title: CowBoy 牛仔配饰检测复盘：从类别不平衡到 YOLO-NAS 训练
+---
+category: 深度学习
+---
+root_path: /program/
+---
+pub_date: 2026-11-23
+---
+author: jcw
+---
+body:
+
+> 本文复盘我在 CowboySuit 配饰目标检测比赛中的完整流程：如何从一份极端长尾的 COCO 标注出发，做单类别过采样与多 JSON 合并，再分别搭建 EfficientDet-D0（COCO 格式）与 YOLO-NAS-M（YOLO 格式）两条训练路线，以及最终暴露出来的训练结果与工程问题。
+
+------
+
+## 一、 赛题与数据诊断
+
+### 1.1 任务是什么
+
+这个比赛要在图片里检测 **5 类牛仔装扮配饰**，标注来自 Open Images 体系（JSON 里带 `freebase_id`），原始标注是 COCO 格式的 bbox `[x_min, y_min, width, height]`。
+
+注意名字里的 CowBoy 指的是 **CowboySuit（牛仔套装）**，不是牛只检测。数据元信息里写着 `description: CowboySuit`、`contributor: GluonCV/AutoGluon`、`year: 2021`。
+
+类别与 ID 映射如下（后续所有数据转换都围绕这张表）：
+
+| 原始 category_id | 类名 | 训练时的类别 ID | freebase_id |
+| :--- | :--- | :--- | :--- |
+| 87 | belt（腰带） | 0 | /m/0176mf |
+| 1034 | sunglasses（墨镜） | 1 | /m/017ftj |
+| 131 | boot（靴子） | 2 | /m/01b638 |
+| 318 | cowboy_hat（牛仔帽） | 3 | /m/025rp__ |
+| 588 | jacket（夹克） | 4 | /m/032b3c |
+
+### 1.2 第一个大问题：极度长尾
+
+原始数据只有 **3,062 张图片、5,594 个标注框**。按类统计后的分布触目惊心：
+
+| 类别 | belt | sunglasses | boot | cowboy_hat | jacket |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| 原始标注框数 | **25** | 2,330 | 449 | 595 | 2,195 |
+
+belt 只有 25 个框，而 sunglasses 有 2,330 个，相差近 100 倍。如果直接训练，模型几乎不可能学会腰带这一类。这直接决定了后续的整个主线：**先在标注层面做类别平衡，再谈模型**。
+
+------
+
+## 二、 整体技术方案 Pipeline
+
+```text
+原始 COCO JSON (3062 图 / 5594 框, belt 仅 25 框)
+   │
+   ▼
+[单类别过采样] Albumentations 几何+光度增强 (RandomSizedBBoxSafeCrop / Flip / HSV / CLAHE ...)
+   │   mid=318, e=8；其它稀有类 e=80
+   ▼
+[多 JSON 合并] 87.json + 131.json + 318.json + train.json -> all_json.json
+   │   9158 图 / 15809 框
+   ├──────────────────────────┐
+   ▼                          ▼
+[路线 A: EfficientDet]     [路线 B: YOLO-NAS]
+COCO 目录结构              images/{train,val} + labels/{train,val}/*.txt
+category 0-4               每行: class cx cy w h (归一化)
+train 8669 / val 488       train 8911 / val 247
+   │                          │
+   ▼                          ▼
+外部 train.py 训练          SuperGradients Trainer 训练
+efficientdet-d0_19_7520.pth yolo_nas_m + COCO 预训练, 20 epoch
+   │                          │
+   ▼                          ▼
+camera.ipynb 推理演示       detect_nas.ipynb 批量推理 + 可视化
+```
+
+------
+
+## 三、 关键数据转换：从长尾到平衡
+
+### 3.1 单类别过采样：图像和 bbox 一起变
+
+核心脚本是 `数据增强(json)/single_id_up.ipynb`。思路很直接：对指定的稀有类别，遍历它所在的每张图片，用 Albumentations 同时变换图像和 bbox，一份变多份。
+
+以 `cowboy_hat`（`mid=318`）为例，原始 346 张图，设置 `e=8`，每张生成 8 份增强图，得到 `346 × 8 = 2768` 张新图：
+
+```python
+mid = 318
+e = 8
+crop_width  = int(width  * 3 / 4)
+crop_height = int(height * 3 / 4)
+
+transform = A.Compose([
+    A.RandomSizedBBoxSafeCrop(height=crop_height, width=crop_width, p=0.8),
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.2),
+    A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30,
+                         val_shift_limit=20, p=0.3),
+    A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
+    A.GaussNoise(var_limit=(10, 50), p=0.2),
+    A.RandomBrightnessContrast(p=0.3),
+], bbox_params=A.BboxParams(
+    format='coco', min_area=500, min_visibility=0.1,
+    label_fields=['category_id']
+))
+
+for i in range(e):
+    augmented = transform(image=image, bboxes=bboxes[x], category_id=labels[x])
+```
+
+这里有几个细节值得记下来：
+
+- `RandomSizedBBoxSafeCrop` 保证裁剪后 bbox 仍然完整，`min_area=500` / `min_visibility=0.1` 过滤掉变得过小的框；
+- 新图命名为 `add_{i}_{mid}_{原文件名}`，新 `image_id` 用 `random.randint(mid*10000, mid*20000)` 并保证不重复；
+- bbox 坐标和 area 都 `round(..., 2)`，写进新的 COCO 子集 JSON（`add_json/318.json`）。
+
+增强后随机抽 50 张画框检查，能确认变换后的标注仍然对得上：
+
+![单类别增强后的标注检查（50 张）](/images/cowboy/augmented_samples.png)
+
+同样的逻辑以 `e=80` 跑过其它类别，所以 belt 从 25 个框涨到了 2,025 个框——这也是后面类别分布变化的来源。
+
+### 3.2 多份 JSON 合并成一份
+
+`merge_img_json.ipynb` 做的是拼图：把 4 份 COCO JSON（`87`、`131`、`318`、`train`）的 `images` 和 `annotations` 直接拼接，重新编号 annotation id，再写出统一的 `all_json.json`。
+
+```python
+source_dirs = ['87', '131', '318', 'train']
+for source in source_dirs:
+    data = json.load(open(f'add_json/{source}.json'))
+    all_annotations.extend(data['annotations'])
+    all_images.extend(data['images'])
+    categories = data['categories']
+
+for i in range(len(all_annotations)):
+    all_annotations[i]['id'] = i
+```
+
+合并结果：**9,158 张图片、15,809 个标注框**，且 image id 恰好没有重复。各类框数变为：
+
+| 类别 | belt | sunglasses | boot | cowboy_hat | jacket |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| 增强合并后 | 2,025 | 2,330 | 4,019 | 5,240 | 2,195 |
+
+长尾问题在数据层面基本被抹平了。
+
+------
+
+## 四、 两条路线的数据准备
+
+### 4.1 EfficientDet：标准 COCO 目录
+
+`CowBoy_EfficientDet/dataset.ipynb` 把增强后的 `all_json.json` 转成 EfficientDet-PyTorch 期望的 COCO 目录结构：`./datasets/coco/{train,val}2017/` 加 `annotations/instances_{train,val}2017.json`，类别 ID 重映射为 0～4。
+
+验证集按**每类 100 个标注框**对应的图片来选（`random.seed(34)` 后 shuffle），最终得到：
+
+- 验证集：488 张图 / 1,493 个框（各类 126 / 247 / 370 / 436 / 314）
+- 训练集：8,669 张图 / 14,305 个框
+
+早期版本 `old_dataset.ipynb` 用的是原始 `train.json` 和 1～5 的类别映射，验证集只有 50 张图 / 177 个框，明显不够用，所以后来换成了每类 100 框的划分方式。
+
+### 4.2 YOLO-NAS：COCO bbox → YOLO txt
+
+`CowBoy_yolo-nas/datasets.ipynb` 走另一条转换路线：图片复制到 `./data/images/{train,val}`，标注写成同名的 `.txt`，每行一个目标：
+
+```python
+x_center = min(max((bbox[0] + bbox[2] / 2) / w, 0), 1)
+y_center = min(max((bbox[1] + bbox[3] / 2) / h, 0), 1)
+width    = min(max(bbox[2] / w, 0), 1)
+height   = min(max(bbox[3] / h, 0), 1)
+# 写成: class_id x_center y_center width height
+```
+
+也就是把 `[x_min, y_min, w, h]` 转成归一化后的 `[cx, cy, w, h]`，并用 `min(max(..., 0), 1)` 截断到 `[0, 1]`。类别映射为 `{87:0, 1034:1, 131:2, 318:3, 588:4}`。
+
+验证集按**每类 50 个标注框**取图，得到 247 张验证图 / 769 个框；训练集 8,911 张图 / 15,040 个框。转换后随机抽 40 张验证图，把 txt 反算回像素坐标画框核对：
+
+![YOLO 标签反算画框检查（40 张）](/images/cowboy/yolo_label_check.png)
+
+------
+
+## 五、 模型训练与训练结果
+
+### 5.1 路线 A：EfficientDet-D0
+
+EfficientDet 这条线的训练**不在 notebook 里**——用的是外部 EfficientDet-PyTorch 风格的 `train.py`，notebook 里只保留了数据准备和推理演示。目录里最终留下的权重是 `efficientdet-d0_19_7520.pth`（约 15 MB），从文件名看是 D0、epoch 19、step 7520。
+
+`camera.ipynb` 用这个权重做摄像头/图片推理，关键配置：
+
+```python
+compound_coef = 0                      # D0, 输入 512
+anchor_ratios = [(1, 1), (1.4, .7), (.7, 1.4)]
+anchor_scales = [1, 2**(1/3), 2**(2/3)]
+threshold = 0.2
+iou_threshold = 0.2
+use_cuda = True
+```
+
+加载时用了 `load_state_dict(state_dict, strict=False)`，输出里能看到不少检测结果，例如：
+
+```text
+Class ID: 1, Label: sunglasses, Score: 0.4908, Bounding Box: [718, 707, 784, 757]
+Class ID: 2, Label: boot,       Score: 0.4351, Bounding Box: [159, 325, 263, 500]
+Class ID: 0, Label: belt,       Score: 0.3800, Bounding Box: [132, 301, 284, 588]
+Class ID: 1, Label: sunglasses, Score: 0.5852, Bounding Box: [646, 819, 860, 1022]
+```
+
+必须说明：**notebook 里没有 EfficientDet 的 mAP 或 loss 记录**，所以这条线只能确认“训练出了权重并能跑通推理”，不能给出精度数值。
+
+### 5.2 路线 B：YOLO-NAS-M（主训练）
+
+第二条线用 SuperGradients 框架，训练代码完整保留在 `CowBoy_yolo-nas/train.ipynb`，这也是本次最完整的一次训练。
+
+数据侧：
+
+```python
+dataset_params = {
+    'data_dir': './data',
+    'train_images_dir': 'images/train',
+    'train_labels_dir': 'labels/train',
+    'val_images_dir': 'images/val',
+    'val_labels_dir': 'labels/val',
+    'classes': ['belt', 'sunglasses', 'boot', 'cowboy_hat', 'jacket']
+}
+train_data = coco_detection_yolo_format_train(
+    dataset_params=..., batch_size=16, num_workers=2
+)
+```
+
+框架自带的增强管线是 `DetectionMosaic → DetectionRandomAffine → DetectionMixup → DetectionHSV → DetectionHorizontalFlip → DetectionPaddedRescale → DetectionTargetsFormatTransform`，训练前可视化了 16 张增强样本，能直观看到马赛克增强和标注框：
+
+![训练增强管线可视化（16 张）](/images/cowboy/train_aug_preview.png)
+
+模型用 `models.get('yolo_nas_m', num_classes=5, pretrained_weights="coco")`，加载了 COCO 预训练权重。训练超参如下：
+
+| 参数 | 取值 |
+| :--- | :--- |
+| 模型 | YOLO-NAS-M（51.13M 参数） |
+| `max_epochs` | 20 |
+| `batch_size` | 16（单卡，有效 batch 16） |
+| 优化器 | Adam，`weight_decay=0.0001` |
+| 学习率 | 初始 `1e-6` warmup 3 epoch → `5e-4`，cosine 衰减到 0.1 倍 |
+| EMA | 开启，`decay=0.9`，`decay_type='threshold'` |
+| 混合精度 | 开启 |
+| Loss | `PPYoloELoss(use_static_assigner=False, num_classes=5, reg_max=16)` |
+| 监控指标 | `DetectionMetrics_050`，`metric_to_watch='mAP@0.50'` |
+
+训练日志（RUN_20241207_185638_888995，约 7 分钟）里的关键信息：
+
+```text
+Full dataset size: 8911
+Batch size per GPU: 16, Total/Effective batch: 16
+Iterations per epoch: 556
+Model: YoloNAS_M (51.13M parameters)
+Checkpoint saved: ...\ckpt_best.pth
+Best checkpoint overriden: validation mAP@0.50: 0.06971430033445358
+```
+
+也就是最终验证 **mAP@0.50 ≈ 0.0697（6.97%）**。这个结果并不理想，日志里也没有分类别 AP 和 mAP@0.5:0.95，无法进一步定位是哪一类拖了后腿。
+
+`detect_nas.ipynb` 里用另一个权重 `yolo_m_bs.pth` 做了单图和批量推理可视化。单图推理结果如下，这张图上没有出现高于阈值的检测框，也从侧面印证了模型效果有限：
+
+![YOLO-NAS 单图推理结果](/images/cowboy/nas_detect_result.png)
+
+------
+
+## 六、 一条没接进主线的旁支：神经风格迁移
+
+`样式迁移/样式迁移.ipynb` 是一次独立探索，用的是《动手学深度学习》里的标准实现：VGG19 特征提取，内容层 `[25]`、风格层 `[0,5,10,19,28]`，把图像本身作为 `nn.Parameter` 用 Adam 优化像素，内容/风格/TV 权重为 `1 / 1e3 / 10`，`lr=0.3`、500 epoch、每 50 epoch 衰减 0.8。
+
+```text
+content_weight, style_weight, tv_weight = 1, 1e3, 10
+output = train(..., lr=0.3, num_epochs=500, lr_decay_epoch=50)
+```
+
+生成结果如下（输出是 SVG 格式的 matplotlib 图）：
+
+![VGG19 神经风格迁移结果](/images/cowboy/style_transfer_result.svg)
+
+需要说清楚的是：输入的两张图是游戏截图，与 cowboy 数据集无关，这条线**没有接入检测流程**，只是练手和验证思路。如果真要用风格迁移做数据增强，也必须只作用于训练集，并验证变换后 bbox 的语义是否保持不变。
+
+------
+
+## 七、 赛后复盘与可优化方向
+
+这次真正有价值的经验，大多来自踩过的坑：
+
+1. **增强时的标签对齐 Bug**
+   `single_id_up.ipynb` 里把 `augmented['bboxes']` 和增强**前**的 `labels[x]` 用 `zip` 配对了。一旦 `min_area` / `min_visibility` 过滤掉某些框，bbox 与类别就错位。正确做法是使用 Albumentations 返回的 `category_id`。
+
+2. **annotation id 复用**
+   同一段代码里 `'id': ann['id']` 引用的是循环遗留变量，所有增强标注共用同一个 id。后来在 merge 和 dataset 脚本里统一重排 id 才修复。
+
+3. **增强早于划分，存在数据泄漏**
+   过采样是在 train/val 划分**之前**做的，同一张原图的增强副本可能同时落进训练集和验证集。正确顺序应该是先按原图划分，再只对训练集做增强。
+
+4. **数据版本不统一**
+   YOLO 分支的 `all_json.json` 是 15,809 个框，EfficientDet 分支是 15,798 个框，两份文件来自不同时刻的生成结果，导致两条线的数据并不完全一致。应给数据文件加版本号或哈希校验。
+
+5. **训练配置偏保守**
+   YOLO-NAS 只跑了 20 epoch 就得到 6.97% 的 mAP，对一个小样本、类别经过人工增强的数据集来说远远不够。至少应训练 100～300 epoch，并补充 `mAP@0.5:0.95` 和 per-class AP，尤其是 belt 类的单独表现。
+
+6. **配置与路径不可复现**
+   脚本里大量硬编码 `C:\data\program\python\CowBoy\...`，SuperGradients 的配置也全部内联在 notebook 里，没有落成 `data.yaml`。`train.ipynb` 最后加载的 `average_model.pth` 还指向了另一次 run（`124235`），与刚训练的 `185638` 不一致。
+
+7. **两条路线评估闭环不对等**
+   EfficientDet 有权重和推理演示，却没有训练脚本和评估记录；YOLO-NAS 有完整训练日志，但最终指标偏低。下次应该从一开始就统一“数据版本 + 训练脚本 + 评估指标”三件套，避免复盘时只能靠猜。
+
+总体来说，这次的核心收获是把“类别极度不平衡的 COCO 标注 → 单类几何/光度增强 → 多 JSON 合并 → COCO 与 YOLO 双格式落地 → 检测器训练与推理”这条链路完整走了一遍。结果不算好，但每一步的转换逻辑和踩坑记录，比一个刷出来的分数更有复用价值。
