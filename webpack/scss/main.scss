@@ -475,6 +475,16 @@ div.badges {
 
 div.text-block {
   margin: 15px 0;
+
+  // Markdown 正文里的图片独占一行，避免文字环绕到图片右侧；
+  // 同时限制最大宽度，防止窄屏下图片撑破容器。
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 15px 0;
+  }
+
   &.text-block-centered {
     text-align: center;
   }

@@ -125,11 +125,12 @@
   <script src="{{ '/js/pjax.js'|asseturl }}"
           data-lib="{{ '/js/vendor/pjax.min.js'|asseturl }}"></script>
 
-  <!-- Live2D 看板娘：实现见 assets/live2d/widget.js（聊天面板/样式/逻辑均已内置） -->
+  <!-- Live2D 看板娘：入口 assets/live2d/widget.js，内部按组件拆到 assets/live2d/js/。
+       type="module" 是必须的（入口用 import 装配各组件），浏览器原生加载，无需打包。 -->
   <!-- 不写 data-chat-api：widget.js 默认走同源 /api/chat，由 Nginx 反代到后端。
        切勿写 http://127.0.0.1:8000 —— 线上页面是 https，会被混合内容拦截，
        且 127.0.0.1 指向访问者自己的电脑而不是服务器。 -->
-  <script src="{{ '/live2d/widget.js'|asseturl }}"
+  <script type="module" src="{{ '/live2d/widget.js'|asseturl }}"
           data-model="{{ '/live2d/dafeiyu/c_0120.model3.json'|asseturl }}"></script>
 </body>
 </html>
