@@ -1,0 +1,193 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ this.title }}{% endblock %}
+{# home 类用于启用首页的点阵底色（见 webpack/scss/_home.scss）；
+   poster 类保留原首页排版约定，PJAX 切页时由 data-bodyclass 同步。 #}
+{% block bodyclass %}poster home{% endblock %}
+
+{% block outerbody %}
+{#
+  数据源说明：本站真正的文章都在 /program（导航栏里的「Blog」），
+  模型是 section-page，字段为 title / pub_date / category / summary / pinned / body。
+  （Lektor 自带示例 /blog 是英文旧文章，不使用。）
+#}
+{% set blog_path = '/program' %}
+
+{# 1. 最新的一篇置顶文章；没有则 pinned_post 为空，整块自动隐藏 #}
+{% set pinned_post = site.query(blog_path).filter(F.pinned == True).order_by('-pub_date').first() %}
+
+{# 2. 最新 3 篇：多取 1 篇，循环里排除已置顶的那篇 #}
+{% set recent_candidates = site.query(blog_path).order_by('-pub_date').limit(4).all() %}
+{% set ns = namespace(latest_posts=[]) %}
+{% for p in recent_candidates %}
+  {% if (not pinned_post or p._id != pinned_post._id) and ns.latest_posts|length < 3 %}
+    {% set ns.latest_posts = ns.latest_posts + [p] %}
+  {% endif %}
+{% endfor %}
+
+{# 3. 分类 → 圆点颜色映射（新增分类会自动落到默认蓝） #}
+{% set cat_colors = {
+  '深度学习': '#3b82f6',
+  '机器学习': '#8b5cf6',
+  '博客': '#10b981',
+  'Python': '#f59e0b'
+} %}
+
+<div class="home-wrapper">
+
+  {# ---------- 1. Hero Bento 双卡 ---------- #}
+  <section class="hero-grid">
+
+    <div class="hero-bio-card">
+      <div class="hero-bio-main">
+        <div class="hero-top-meta">
+          <span class="serif-eyebrow">Digital Garden &amp; Engineering Notes.</span>
+          <div class="hero-pills">
+            <span class="mono-pill accent">LLM &amp; Agent</span>
+            <span class="mono-pill">WorldQuantBrain</span>
+          </div>
+        </div>
+
+        <h1 class="hero-title">你好，我是 <span class="serif-name">W JC</span> 👋</h1>
+
+        <div class="terminal-bar">
+          <span class="prompt">❯</span><span id="typewriter-text"></span><span class="cursor">|</span>
+        </div>
+
+        <p class="hero-desc">
+          坐标重庆，曾于重庆大学国家卓越工程师学院交流智能网联汽车。专注于 <strong>PyTorch 视觉微调</strong>、<strong>LangChain 智能体编排</strong> 与 <strong>FastAPI 工程落地</strong>，在此记录我的技术思考与代码实践。
+        </p>
+      </div>
+
+      <div class="hero-actions">
+        <a class="btn-dark" href="{{ '/about/'|url }}">查看完整履历 →</a>
+
+        <a class="btn-outline" href="https://github.com/jcw-2002" target="_blank" rel="noopener">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.20-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.20-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.10.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.20 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+          </svg>
+          GitHub
+        </a>
+
+        <a class="btn-outline" href="{{ '/contact/'|url }}">✉ 联系我</a>
+      </div>
+    </div>
+
+    <div class="hero-photo-card">
+      <img src="{{ '/images/introduction/me.jpg'|url }}" alt="W JC">
+      <span class="photo-location-pill">📍 重庆</span>
+      <div class="photo-overlay">
+        <div class="photo-status"><span class="status-dot"></span>Open to Collaborate</div>
+        <div class="photo-name">W JC</div>
+      </div>
+    </div>
+
+  </section>
+
+  {# ---------- 2. 精选置顶（无置顶文章时整块不输出） ---------- #}
+  {% if pinned_post %}
+  <section class="home-section">
+    <div class="section-head">
+      <div class="section-label">FEATURED<span> · 精选置顶</span></div>
+    </div>
+
+    <a class="pinned-card" href="{{ pinned_post|url }}">
+      <div class="pinned-top">
+        <span class="pinned-badge">📌 置顶</span>
+        <span class="pinned-meta">
+          {{ pinned_post.category or '随笔' }} · {{ pinned_post.pub_date|dateformat('yyyy-MM-dd') }}
+        </span>
+      </div>
+
+      <h3 class="pinned-title">{{ pinned_post.title }}</h3>
+
+      <div class="pinned-bottom">
+        <p class="pinned-summary">
+          {{ pinned_post.summary or (pinned_post.body|striptags|truncate(120)) }}
+        </p>
+        <span class="pinned-cta">阅读全文 →</span>
+      </div>
+    </a>
+  </section>
+  {% endif %}
+
+  {# ---------- 3. 最新更新 3 篇 ---------- #}
+  <section class="home-section">
+    <div class="section-head">
+      <div class="section-label">LATEST POSTS<span> · 最新更新</span></div>
+      <a class="section-all-link" href="{{ blog_path|url }}">查看全部文章 →</a>
+    </div>
+
+    {% if ns.latest_posts %}
+    <div class="posts-grid">
+      {% for post in ns.latest_posts %}
+      {% set dot = cat_colors.get(post.category, '#3b82f6') %}
+      <a class="post-card" href="{{ post|url }}">
+        <div class="post-card-main">
+          <div class="post-card-top">
+            <span class="post-date">{{ post.pub_date|dateformat('yyyy-MM-dd') }}</span>
+            <span class="post-cat"><span class="post-cat-dot" style="background: {{ dot }}"></span>{{ post.category or '随笔' }}</span>
+          </div>
+
+          <h3 class="post-title">{{ post.title }}</h3>
+          <p class="post-summary">{{ post.summary or (post.body|striptags|truncate(90)) }}</p>
+        </div>
+
+        <span class="post-readmore">阅读全文 →</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="home-empty">还没有文章，去后台写第一篇吧。</p>
+    {% endif %}
+  </section>
+
+</div>
+
+{# ---------- LLM 终端流式打字机 ---------- #}
+<script>
+(function () {
+  // PJAX 切回首页时内联脚本可能再执行一次，避免叠出多个计时器
+  if (window.__homeTypewriterTimer) {
+    clearTimeout(window.__homeTypewriterTimer);
+    window.__homeTypewriterTimer = null;
+  }
+
+  const phrases = [
+    "正在探索：自动驾驶关键场景生成 & 大模型 Agent 工作流",
+    "技术栈：PyTorch / LangChain / FastAPI / Docker",
+    "身份：WorldQuant Brain 顾问 · 重庆工程实践者",
+    "欢迎阅读我的技术复盘与开源项目笔记 ✨"
+  ];
+  const el = document.getElementById("typewriter-text");
+  if (!el) return;
+
+  let pIdx = 0, cIdx = 0, isDeleting = false;
+
+  function tick() {
+    // 已经 PJAX 切走（节点被替换）就停掉，不要空转
+    if (!el.isConnected) {
+      window.__homeTypewriterTimer = null;
+      return;
+    }
+
+    const current = phrases[pIdx];
+    el.textContent = current.slice(0, cIdx);
+    let delay = isDeleting ? 35 : 65;
+
+    if (!isDeleting && cIdx === current.length) {
+      delay = 2200;
+      isDeleting = true;
+    } else if (isDeleting && cIdx === 0) {
+      isDeleting = false;
+      pIdx = (pIdx + 1) % phrases.length;
+      delay = 400;
+    } else {
+      cIdx += isDeleting ? -1 : 1;
+    }
+    window.__homeTypewriterTimer = setTimeout(tick, delay);
+  }
+  tick();
+})();
+</script>
+{% endblock %}

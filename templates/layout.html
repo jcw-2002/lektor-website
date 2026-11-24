@@ -7,6 +7,11 @@
   <link rel="stylesheet" href="{{ '/static/styles.css'|asseturl }}">
   <link rel="stylesheet" href="{{ get_pygments_stylesheet()|url }}">
   <link rel="shortcut icon" href="{{ '/static/favicon.png'|asseturl }}">
+  {# 首页标题用的衬线斜体（Instrument Serif）与等宽字体（JetBrains Mono），
+     放在全局 head 里，PJAX 切页时不会因 <head> 不重建而丢失 #}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <title>{% block title %}Hello{% endblock %} | 欢迎来到我的博客</title>
 </head>
 <body class="{% block bodyclass %}default{% endblock %}">
@@ -32,9 +37,13 @@
           {% endfor %}
           {# 云盘：由服务器 Nginx 反代到本地 dufs（127.0.0.1:5000）。
              这里写死绝对路径 /files（站点部署在域名根目录，不走 Lektor 的内容解析）。
-             data-pjax="false" 让点击走浏览器原生整页跳转，否则 PJAX 会把 dufs 的页面
-             塞进 #pjax-container 里，外观和功能都会错乱。 #}
-          <li><a href="/files" data-pjax="false">云盘</a></li>
+             它是另一套应用，绝不能被本站 PJAX 接管（否则 dufs 的页面会被塞进
+             #pjax-container，样式和路由全乱）。这里上了双保险，两道判据都独立生效：
+               1. data-pjax="false" —— pjax.js 的 elements 选择器里有 :not([data-pjax="false"])；
+               2. target="_blank"   —— pjax 的 elements 同样有 :not([target])，
+                  浏览器也一定走原生导航；顺带把 dufs 开在新标签页，不打断博客。 #}
+          <li><a href="/files" data-pjax="false" target="_blank"
+            rel="noopener noreferrer">云盘</a></li>
         </ul>
       </div>
     </div>

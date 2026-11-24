@@ -1,7 +1,12 @@
 [project]
 name = Lektor
-url = https://www.getlektor.com/
-url_style = relative
+url = https://wanjc.top/
+# 必须用 absolute：站点部署在域名根路径（/var/www/wanjc.top，站点 https://wanjc.top）。
+# Lektor 的 404 页面是在根目录编译的（/404.html），却会被 Nginx 的 error_page
+# 以任意深度 URL 返回（/test-404/、/a/b/c/ ...），相对路径会解析到
+# /test-404/live2d/... 这种不存在的位置。absolute 输出的是根相对路径
+# （/live2d/...、/static/...、/about/），与 404 页被服务的地址无关。
+url_style = absolute
 
 [servers.ghpages]
 enabled = yes

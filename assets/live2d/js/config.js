@@ -5,9 +5,13 @@
  * 标签取 data-model / data-chat-api。
  *
  * 模型地址必须在这一步就解析成绝对地址：oml2d 是异步加载的，真正发请求时
- * 文档地址可能已经被 PJAX 的 pushState 改成了别的目录，相对路径会解析到
- * /blog/live2d/... 这种不存在的位置（控制台 404 + modelSize 崩溃）。
- * 此刻 document.baseURI 还是真实地址。
+ * 文档地址可能已经被 PJAX 的 pushState 改成别的目录，相对路径会解析到
+ * /update/live2d/... 这种不存在的位置（控制台 404 + modelSize 崩溃）。
+ *
+ * 主防线是模板侧：项目用 url_style = absolute（见 Website.lektorproject），
+ * data-model 里拿到的是 /live2d/... 这种根相对路径，404 页面被任意深度 URL
+ * 服务时也不会拼错。这里的 pageUrl() 是给相对地址留的兜底 ——
+ * 用「文档加载时的地址」而不是会被 pushState 改掉的 document.baseURI。
  */
 
 const ENTRY_RE = /(?:^|\/)widget\.js(?:[?#]|$)/;
@@ -26,9 +30,31 @@ function findEntryScript() {
   return null;
 }
 
+/*
+ * 「这份文档真正被加载时」的地址。
+ *
+ * 不能用 document.baseURI：PJAX 的 pushState 会把 location 和 document.baseURI
+ * 一起改掉，而模板里 |asseturl 生成的是相对地址（url_style = relative），
+ * 是按「服务端渲染这份文档时的地址」算出来的。两者一旦不同步就会解析错：
+ *   首页的 data-model = live2d/dafeiyu/c_0120.model3.json
+ *   先 PJAX 到 /update/，模块后执行 → 解析成 /update/live2d/... → 404
+ * 模型 JSON 404 会让库的加载链失败，然后在拿不到 internalModel 的模型上量尺寸崩溃。
+ *
+ * navigation entry 记录的是文档加载时的真实地址，pushState 不会改它。
+ */
+function pageUrl() {
+  try {
+    const entry = performance.getEntriesByType('navigation')[0];
+    if (entry && entry.name) return entry.name;
+  } catch (err) {
+    /* 没有 Navigation Timing 就退回 baseURI（此时多半还没切过页） */
+  }
+  return document.baseURI;
+}
+
 function toAbsolute(url) {
   try {
-    return new URL(url, document.baseURI).href;
+    return new URL(url, pageUrl()).href;
   } catch (err) {
     return url;
   }

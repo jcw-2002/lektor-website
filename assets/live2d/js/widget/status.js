@@ -82,8 +82,9 @@ export function clearStaleSleepStatus(mq) {
  * @param {MediaQueryList} options.mq 窄屏判定
  * @param {() => object|null} options.getInstance 当前 oml2d 实例
  * @param {() => void} options.afterSummon 模型就绪后的收尾（收拢拖拽位置）
+ * @param {object} [options.gate] 就绪闸门：唤醒期间按住站内导航（同初始化期护栏）
  */
-export function createMobileSummon({ mq, getInstance, afterSummon }) {
+export function createMobileSummon({ mq, getInstance, afterSummon, gate }) {
   let summoned = false;      // 模型已经唤出，后续点击不再打扰
   let attempting = false;    // 正在加载，避免连点重入
   let bound = false;
@@ -161,6 +162,8 @@ export function createMobileSummon({ mq, getInstance, afterSummon }) {
 
     const bar = getBar();
     attempting = true;
+    // 加载期间别让 PJAX 切页：打断库的初始化链会让看板娘崩掉（见 gate.js）
+    if (gate) gate.close();
 
     try {
       // 运行时长开 mobileDisplay，绕开创建时就定下来的 mobileHidden
@@ -184,6 +187,9 @@ export function createMobileSummon({ mq, getInstance, afterSummon }) {
         showHint(current);
       }
       return;
+    } finally {
+      // 加载窗口结束（成功或失败）都要放行导航
+      if (gate) gate.open();
     }
 
     attempting = false;

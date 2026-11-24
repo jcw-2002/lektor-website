@@ -104,7 +104,78 @@
 
     var a = findAnchor(e.target);
     if (!a) return;
-    if (FILE_RE.test(a.pathname || '')) e.stopPropagation();
+    if (FILE_RE.test(a.pathname || '')) {
+      e.stopPropagation();
+      return;
+    }
+
+    if (isPjaxLink(a) && holdForLive2D(a.href)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+
+  /* ---------- Live2D 初始化期护栏 ---------- */
+
+  /*
+   * 看板娘的模型是异步加载的，加载途中如果切页，库会被打断：
+   *   oh-my-live2d 的 loadModel() 写成 `create().catch(报错).then(挂载 + 取尺寸)`，
+   *   catch 里没有 return，所以加载失败时 then 照样跑，在一个还没 internalModel
+   *   的模型上取宽高 → TypeError（Uncaught in promise），坏模型还被挂进 PIXI，
+   *   渲染循环随后每帧报 TypeError，看板娘就废了。
+   *
+   * assets/live2d/widget.js 初始化时会挂上 window.__oml2dGate，pending 期间这里把
+   * 站内导航先按住，等闸门打开（模型就绪/失败/超时）再真正切页。
+   * 只影响几百毫秒的加载窗口，且闸门有超时兜底，不会把导航卡死。
+   */
+  var heldHref = null;
+  var holdQueued = false;
+
+  function gate() {
+    return window.__oml2dGate || null;
+  }
+
+  /* 与 ELEMENTS / guardClick 判据保持一致：只有 pjax 本来会接管的链接才按 */
+  function isPjaxLink(a) {
+    if (a.hasAttribute('target') || a.hasAttribute('download')) return false;
+    if (a.getAttribute('data-pjax') === 'false') return false;
+
+    var href = a.getAttribute('href') || '';
+    if (!href || href.charAt(0) === '#') return false;
+    if (/^(?:javascript|mailto|tel):/i.test(href)) return false;
+
+    var path = a.pathname || '';
+    if (path.indexOf('/admin') === 0) return false;
+    if (FILE_RE.test(path)) return false;
+
+    // 外链由 pjax 自己判断并放行，这里别插手
+    if (a.origin && a.origin !== window.location.origin) return false;
+    return true;
+  }
+
+  /**
+   * 切页前等看板娘就绪。
+   * @returns {boolean} true 表示本站点击已被接管（调用方要 preventDefault）
+   */
+  function holdForLive2D(href) {
+    var live2d = gate();
+    if (!live2d || !live2d.pending) return false;
+    if (!href || href === window.location.href) return false;
+
+    heldHref = href;          // 连点时以最后一次点击为准
+    if (holdQueued) return true;
+    holdQueued = true;
+
+    live2d.promise.then(function () {
+      var target = heldHref;
+      heldHref = null;
+      holdQueued = false;
+      if (!target) return;
+      if (pjax && typeof pjax.loadUrl === 'function') pjax.loadUrl(target);
+      else window.location.assign(target);
+    });
+
+    return true;
   }
 
   /* ---------- 切页后的重新初始化 ---------- */
