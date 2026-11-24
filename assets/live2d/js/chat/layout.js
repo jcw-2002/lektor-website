@@ -8,7 +8,9 @@
 
 import { clampNum, localStore } from '../util.js';
 
-const DEFAULT_SIZE = { w: 320, h: 420 };
+/* 默认尺寸 16:9（512×288）。已有用户本地拖过大小的话以 localStorage 里的为准，
+   想回到这个默认值需要先清掉 oml2d-chat-size（config.keys.panelSize）。 */
+const DEFAULT_SIZE = { w: 512, h: 288 };
 const MIN_SIZE = { w: 260, h: 240 };
 const EDGE = 8;        // 拖动/缩放时的最小留边
 const MARGIN = 12;     // 自动摆放时的留边

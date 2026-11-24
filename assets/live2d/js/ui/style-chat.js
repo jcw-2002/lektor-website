@@ -6,7 +6,7 @@
 export function chatStyle() {
   return `
 /* ===== 面板骨架 ===== */
-#oml2d-chat { position:fixed; left:0; top:0; width:320px; height:420px;
+#oml2d-chat { position:fixed; left:0; top:0; width:512px; height:288px;
   display:none; flex-direction:column; overflow:hidden; border-radius:8px;
   background:#fff; border:1px solid #e6e6e6; z-index:10000;
   box-shadow:0 4px 14px rgba(0,0,0,.07);

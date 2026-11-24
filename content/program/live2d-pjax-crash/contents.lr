@@ -1,0 +1,314 @@
+_model: section-page
+---
+title: 看板娘崩溃记：PJAX + Live2D + Lektor 相对路径的三重坑
+---
+summary: 一个只在"手快"时才复现的 Live2D 崩溃，最后追出三层原因：第三方库的错误处理缺陷、pushState 改掉 document.baseURI、以及 404 页面被任意深度 URL 服务时的相对路径。
+---
+category: 博客
+---
+root_path: /program/
+---
+pub_date: 2026-11-24
+---
+author: jcw
+---
+body:
+
+站点的结构稍微有点复杂：正文是 Lektor 生成的静态站，用 PJAX 做局部无刷新跳转；右下角挂了一个 oh-my-live2d 的看板娘（PIXI 渲染，模型异步加载）；同一个域名下还有一条 `/files` 被 Nginx 反代到 dufs 云盘。构建产物由 GitHub Actions 推到服务器 `/var/www/wanjc.top`，**部署在域名根路径**。
+
+看板娘平时一直正常，只有一个操作序列能让它彻底废掉：**在某次页面加载里，趁模型还没加载完就点导航栏**。等它加载完再点，怎么点都没事。
+
+这篇记录完整的排查过程。真正有价值的部分不是"改一行就好了"，而是这条 bug 链上其实叠了三个独立的问题，其中两个平时完全看不出来。
+
+## 一、现象
+
+控制台留下的是这样一对错误（前后脚出现）：
+
+```text
+Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'width')
+    at Tc._calculateBounds (oml2d.min.js:738:3804)
+    at t.calculateBounds  (oml2d.min.js:731:10489)
+    at t.getBounds        (oml2d.min.js:731:1804)
+    at t.getLocalBounds   (oml2d.min.js:731:2311)
+    at t.getLocalBounds   (oml2d.min.js:731:11027)
+    at Tc.get             (oml2d.min.js:731:13006)
+    at get modelSize      (oml2d.min.js:802:12170)
+    at oml2d.min.js:1720:6847
+
+Uncaught TypeError: Cannot read properties of null (reading 'transform')
+    at t.updateTransform  (oml2d.min.js:731:10263)
+    at t.updateTransform  (oml2d.min.js:731:10404)
+    at t.render           (oml2d.min.js:636:25055)
+    at i.render           (oml2d.min.js:1671:1421)
+    at i.emit             (oml2d.min.js:212:541)
+    at i.update           (oml2d.min.js:212:3403)
+    at _tick              (oml2d.min.js:212:1405)
+```
+
+三个细节值得先记住：
+
+1. 第一条是 **`Uncaught (in promise)`** —— 说明它是在某个 Promise 链里抛的，不是普通事件回调；
+2. 第二条来自 **ticker**（`_tick → update → emit → render`），即渲染循环在每帧报错 —— 所以看板娘不是"卡住"，是**每帧都在崩**，只能刷新页面；
+3. 报错全在 `oml2d.min.js` 里，看起来像"库的 bug"，但它只在特定操作下出现。
+
+## 二、第一层：不是 PJAX 弄坏了看板娘，是库自己在失败后踩自己
+
+`oml2d.min.js` 是一行几万字符的压缩产物，只能靠报错的行号 + 列号反查。浏览器给的列号很准，配合 `Get-Content` 取那一行做 `Substring` 就能看到原文。
+
+`738:3804` 落在 `pixi-live2d-display` 的 `_calculateBounds` 上：
+
+```js
+_calculateBounds() {
+  this._bounds.addFrame(this.transform, 0, 0,
+    this.internalModel.width, this.internalModel.height);
+}
+```
+
+`this.internalModel` 是 `undefined`，于是读 `.width` 就炸。而 `internalModel` 是在模型设置 JSON / moc / 贴图都准备好之后才被赋值的 —— **它是"模型还没建好"的信号**。
+
+再看 `1720:6847`，正好是 oml2d 自己的 `loadModel()`：
+
+```js
+loadModel() {
+  return (async () => {
+    ...
+    return this.statusBar.showLoading(),
+      this.models.create()
+        .catch(() => { this.statusBar.loadingError(() => this.reloadModel()); })  // ← 没有 return
+        .then(() => {
+          this.pixiApp.mount(this.models.model);          // 坏模型先被挂进 PIXI
+          ...
+          this.stage.reloadStyle(this.models.modelSize);  // ← 就在这里取宽高
+          this.pixiApp.resize();
+          this.statusBar.hideLoading();
+        });
+  })();
+}
+```
+
+**`catch` 之后没有 `return`，Promise 链会继续往下走**。所以模型加载失败时，`then` 照样执行：先 `mount` 一个半成品模型，再去拿它的尺寸 → 第一条错误；挂进舞台的坏模型又会进渲染循环 → 第二条错误。
+
+一句话总结第一层：**"加载失败"这个可恢复的错误，被库自己放大成了"看板娘永久崩溃"**。两条错误是成对出现的因果，不是两个独立问题。
+
+`retryOnce` 就是想在这一层兜底（下面会讲），但**光兜底没用**，得先搞清楚加载为什么会失败。
+
+## 三、第二层：模型地址被 `pushState` 改掉了
+
+一开始我以为是"切页打断了加载"。但后来控制台里出现了更直接的证据：
+
+```text
+GET http://localhost:5000/update/live2d/dafeiyu/c_0120.model3.json?h=a1c84e4e 404 (NOT FOUND)
+[XHRLoader] Failed to load resource as json (Status 404)
+```
+
+注意这个 `/update/`：模型文件实际在 `/live2d/dafeiyu/` 下，`/update/` 是**当时地址栏所在的那一页**。
+
+原因在 Lektor 的 `url_style = relative`（`Website.lektorproject`）：
+
+- 模板里 `{{ '/live2d/...'|asseturl }}` 会输出**相对地址**，在首页上就是 `live2d/dafeiyu/c_0120.model3.json?h=...`（带构建哈希）；
+- `assets/live2d/js/config.js` 用 `new URL(attr, document.baseURI)` 把它变成绝对地址；
+- **`pushState` 会同时改掉 `location` 和 `document.baseURI`**。
+
+于是出现了一个很隐蔽的时序窗口：
+
+```text
+1. 首页 HTML 已解析，live2d 模块还在下载（模块 + 1MB 的库 + 模型）
+2. 用户点了导航 → PJAX 先跑完，pushState 把地址改成 /update/
+3. live2d 模块这时才执行 → document.baseURI 已经是 /update/
+4. live2d/... + /update/ → /update/live2d/... → 404
+```
+
+这也解释了"为什么手快才复现、加载完再点就没事"：**一旦初始化把地址固化成绝对 URL，后面再怎么切页都不影响它**。我之前那次修复（用 Navigation Timing 的 `navigation` entry 取代 `baseURI`）解决的就是这个窗口——它记录的是文档真正被加载时的地址，`pushState` 改不到它。
+
+## 四、第三层：404 页面会被任意深度的 URL 服务
+
+第二层修完，首页 → `/update/` 这条路径正常了。但还有一个更根本的问题：**404 页面**。
+
+Lektor 的自定义 404 是在根目录编译出来的（`/404.html`），而 Nginx 的 `error_page 404 /404.html` 会让它以**任意 URL** 返回给浏览器：`/test-404/`、`/a/b/c/`，甚至 `/cloud/`。
+
+这时候文档的"真实地址"是 `/test-404/`，而 `404.html` 里的资源链接是相对路径（`live2d/dafeiyu/...`、`static/styles.css`）——不管用哪个基准，都会拼成：
+
+```text
+/test-404/live2d/dafeiyu/c_0120.model3.json   → 404
+/test-404/static/styles.css                   → 404（连样式都没了）
+```
+
+也就是说，**只要 404 页面自己带看板娘，在任何深层 404 URL 上它必然加载失败**，然后回到第二层那个 `catch().then()`，照样永久崩溃。这也解释了为什么本地"点云盘 → 404 页 → 马上点导航"特别容易复现：那是唯一会让 live2d 在一个"深度不明"的 URL 上重新初始化的场景。
+
+Lektor 官方对自定义 404 的要求就是：**`url_style` 不能用相对的**。官方支持三种值，源码里是这样落地的（`lektor/db.py`）：
+
+```python
+url_style = self.db.config.url_style
+absolute = url_style == "absolute"
+...
+if absolute:
+    return urljoin(self.db.config.base_path, url.lstrip("/"))
+```
+
+`base_path` 取的是 `PROJECT.url` 的**路径部分**（我们部署在根路径，就是 `/`）。所以 `url_style = absolute` 输出的是**根相对地址**（`/live2d/...`、`/static/...`、`/about/`），既不带域名、也不受文档 URL 深度影响，本地 `localhost:5000` 也照样能用。
+
+## 五、解决思路：分四层，前两层治地址，后两层治时序
+
+| 层 | 位置 | 解决什么 | 为什么必须在这一层 |
+|---|---|---|---|
+| L1 地址 | `Website.lektorproject` | 404 页在任意深度 URL 下资源全 404 | 模板编译期就把 URL 固化成根相对，浏览器和库怎么拼都不会错 |
+| L2 基准 | `assets/live2d/js/config.js` | `pushState` 改 `baseURI` 导致的 `/update/live2d/...` | 万一以后有人把 `url_style` 改回 `relative`，还有兜底 |
+| L3 时序 | `assets/live2d/js/widget/gate.js` + `assets/js/pjax.js` | 模型加载途中被切页打断 | 库的 `catch().then()` 改不了，只能保证"别在窗口期打断它" |
+| L4 自愈 | `assets/live2d/widget.js` | 真失败了也别永久死掉 | 库里加载失败后不会自己恢复 |
+
+另外还顺手处理了"云盘链接不该被 PJAX 接管"，见第六节最后一条。
+
+## 六、具体改动
+
+### 1. `url_style` 改成 absolute（治本）
+
+```ini
+[project]
+name = Lektor
+url = https://wanjc.top/
+# 站点部署在域名根路径；404 页以任意深度 URL 返回，相对路径会拼成
+# /test-404/live2d/... 这种不存在的位置。
+url_style = absolute
+```
+
+顺带把 `PROJECT.url` 从上游的 `https://www.getlektor.com/` 改成真实域名 —— 它是 `|url(external=true)`（sitemap）和 atom feed 的拼接基准，本来就该是本站域名。
+
+改完的连带好处：404 页面上的导航链接也变成 `/program/` 而不是 `program/`，在 `/test-404/` 这种地址上终于点得动了（以前会 404）。
+
+### 2. `config.js`：解析基准不用 `document.baseURI`
+
+```js
+function pageUrl() {
+  try {
+    const entry = performance.getEntriesByType('navigation')[0];
+    if (entry && entry.name) return entry.name;   // 文档加载时的真实地址，pushState 改不到
+  } catch (err) {
+    /* 没有 Navigation Timing 就退回 baseURI */
+  }
+  return document.baseURI;
+}
+
+function toAbsolute(url) {
+  try {
+    return new URL(url, pageUrl()).href;
+  } catch (err) {
+    return url;
+  }
+}
+```
+
+现在主防线是 L1（拿到的是 `/live2d/...`，`new URL` 无论如何都对），这段是给相对地址留的兜底 —— 同时也是这次排障最关键的认知修正：**`document.baseURI` 不等于"这份 HTML 从哪来的"**。
+
+### 3. 加载闸门：模型没就绪就别切页
+
+新增 `assets/live2d/js/widget/gate.js`，一个极小的开关：
+
+```js
+export function createGate(timeout) {
+  let timer = 0;
+  let resolvePending = null;
+  let pendingPromise = Promise.resolve();
+
+  const gate = {
+    get pending() { return !!resolvePending; },
+    get promise() { return pendingPromise; },
+
+    close() {                       // 进入加载窗口
+      if (resolvePending) return;
+      pendingPromise = new Promise((resolve) => { resolvePending = resolve; });
+      timer = setTimeout(gate.open, timeout || 4000);
+    },
+    open() {                        // 成功 / 失败 / 超时都要放行
+      clearTimeout(timer);
+      const resolve = resolvePending;
+      resolvePending = null;
+      if (resolve) resolve();
+    }
+  };
+  return gate;
+}
+```
+
+`widget.js` 在**库就位、模型开始加载**的那一刻关闸，在 `onLoad` 的 `success` / `fail` 上开闸（成功留 300ms 余量，等库的 `mount → 量尺寸 → resize` 跑完）。
+
+`assets/js/pjax.js` 在**捕获阶段**读这个闸门：加载窗口内的站内点击先 `preventDefault + stopPropagation` 按住，闸门打开后再用 `pjax.loadUrl()` 补上这次导航。
+
+```js
+function guardClick(e) {
+  ...
+  if (isPjaxLink(a) && holdForLive2D(a.href)) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}
+```
+
+几个边界都照顾到了：
+
+- 只拦**本来会被 PJAX 接管**的链接（外链、`target`、`download`、`data-pjax="false"`、`/admin`、文件直链一律不拦）；
+- 连点时以**最后一次点击**为准，不会排两次导航；
+- 闸门一定因"就绪 / 失败 / 超时"打开，导航最多延迟几百毫秒，**不会卡死**；
+- 窄屏默认不加载模型（`mobileDisplay: false`），这种情况下压根不关闸，避免白等。
+
+### 4. 失败自愈 + 同步初始化锁
+
+库那次失败不重试就永远是死的，所以 `onLoad('fail')` 时替它重试一次。但重试不能撞上切页：
+
+```js
+document.addEventListener('pjax:send', () => { navigating = true; });
+document.addEventListener('pjax:complete', () => {
+  navigating = false;
+  if (retryPending) retryOnce();
+});
+
+function retryOnce() {
+  if (retried || !instance) return;
+  if (navigating) { retryPending = true; return; }   // 等切页落地再修
+  retried = true;
+  gate.close();                                      // 重试也在加载窗口内
+  setTimeout(() => { instance.reloadModel()... }, 1500);
+}
+```
+
+外加一个同步初始化锁，防止模块被重复执行（重复注入脚本、将来有人把 `<script>` 搬进 PJAX 替换区）时出现两个 oml2d 实例、两个 PIXI ticker：
+
+```js
+if (!window.__oml2dBooted) {
+  window.__oml2dBooted = true;
+  bootstrap();
+}
+```
+
+同时在 `loadOml2dLibrary(...).then()` 里补了 `if (instance) return;`，双保险。
+
+### 5. 云盘链接上双保险
+
+`/files` 是 Nginx 反代到 dufs 的另一套应用，绝不能被本站 PJAX 接管（否则 dufs 的整页 HTML 会被塞进 `#pjax-container`）。原来只有 `data-pjax="false"`，现在再加一条 `target="_blank"`：
+
+```html
+<li><a href="/files" data-pjax="false" target="_blank"
+  rel="noopener noreferrer">云盘</a></li>
+```
+
+`pjax.js` 的 `elements` 选择器里对这两种情况都有排除（`:not([data-pjax="false"])`、`:not([target])`），两道判据互相独立；顺带把云盘开在新标签页，不再打断博客和看板娘。
+
+## 七、验收清单
+
+这类"只在特定时序复现"的 bug，验收必须专门针对时序，普通点点点测不出来：
+
+- **构建**：`lektor build` 通过，检查产物里 `data-model`、`<script src>`、`<link href>` 都是 `/live2d/...`、`/static/...` 这种根相对地址；
+- **深层 404**：直接访问 `/test-404/`（**必须带末尾斜杠**）和 `/a/b/c`，Network 里模型 JSON、CSS、JS 全部 200；控制台无 `[XHRLoader]` 报错；
+- **快切竞态**：在 `/test-404/` 刷新后，趁看板娘还在加载**连续快速点击**导航栏，控制台不应出现 `reading 'width'` / `reading 'transform'`；点击最多延迟几百毫秒生效；
+- **云盘**：点击后是新标签页打开 `/files`（本地没反代就是 404 页），原标签的看板娘不受影响；
+- **常规**：首页 ↔ 二级页面切页，看板娘持久存在（不重新加载）、位置与拖拽记忆正常。
+
+## 八、几条可复用的经验
+
+1. **`catch` 后面接 `then`，等于让错误"看起来被处理了"**。`.catch(fn).then(fn2)` 在 Promise 规范里是合法的，但语义几乎总是错的 —— 只要 `catch` 里没有 `return`，`then2` 就会在"失败状态"下继续跑。这是这次崩溃的放大器，也是所有三方库都值得查一遍的写法。
+2. **`document.baseURI` 会被 `pushState` 改掉，它不代表"这份 HTML 从哪来的"**。需要用真实来源时，`performance.getEntriesByType('navigation')[0].name` 才是可靠来源。
+3. **静态站 + 局部刷新 + 异步第三方库，是三类坑的交汇点**：URL 基准会被改、DOM 会被换、库的生命周期没人管。
+4. **404 页面必须用根相对地址**。它会被任意深度 URL 服务，任何相对路径都会拼错——这不是"优化"，是硬性要求。
+5. **调压缩代码时别硬读**：报错的行号 + 列号非常准，按列号 `Substring` 出来看原文，比猜函数名快得多。
+6. **"报错在库里"不等于"库的错"**。这次两个 `TypeError` 全在 `oml2d.min.js` 里，但根因一个在模板的 URL 风格、一个在 PJAX 的 `pushState`；库只负责把一个小错误放大成崩溃。
+
+最后留一句自我提醒：**能复现"只有手快才炸"的问题，几乎一定是时序问题**，而时序问题要先查"谁改了共享状态"（这里是地址栏、DOM、渲染器），再谈修法。
