@@ -271,6 +271,53 @@ div.doc-styling, div.blog-post, div.plugin {
   }
 }
 
+/*
+ * 长内容不再撑破正文列（窄屏尤其明显）：
+ * 超出列宽的部分在元素内部横向滚动，而不是把整页顶出屏幕。
+ *
+ * 表格在 HTML 里没有额外的包装元素，只能把它自身变成块级滚动容器
+ * （GitHub Markdown 同款做法）：能换行的单元格照常换行，
+ * 只有真正不可折行的超长内容才会让表格内部出现横向滚动条。
+ */
+div.doc-styling, div.blog-post, div.plugin {
+  table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  // 公式（display 模式）常常比屏幕宽，给一层横向滚动而不是直接溢出
+  .katex-display,
+  mjx-container[display="true"] {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+  }
+}
+
+// 窄屏下超长的行内代码允许断行：inline 元素没法自带滚动条，只能换行
+@media (max-width: $screen-xs-max) {
+  div.doc-styling, div.blog-post, div.plugin {
+    code {
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+    }
+  }
+
+  pre code {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+}
+
 div.blog-post {
   padding: 0 0 50px 0;
 

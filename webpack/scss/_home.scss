@@ -40,10 +40,18 @@ body.home div.body-wrapper {
   // --- 1. Hero Bento 双卡（严格等高） ---
   .hero-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    // minmax(0, …) 而不是裸的 2fr / 1fr：
+    // fr 的自动最小值是 min-content，打字机那行 nowrap 文案一旦变长，
+    // 就会把整个栅格撑到视口之外（手机上会连带整页缩放，照片卡跟着变形）。
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     gap: 20px;
     align-items: stretch;
     margin-bottom: 3rem;
+
+    // 栅格项同样要允许收缩，否则内容仍能把轨道顶宽
+    > * {
+      min-width: 0;
+    }
   }
 
   .hero-bio-card {
@@ -55,6 +63,7 @@ body.home div.body-wrapper {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    min-width: 0;
   }
 
   .hero-top-meta {
@@ -126,6 +135,10 @@ body.home div.body-wrapper {
     font-size: 13px;
     color: #3f3f46;
     min-height: 38px;
+    // 兜底：无论文案多长都收在卡片内，绝不外溢撑宽页面
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
 
     .prompt {
       color: #2563eb;
@@ -134,6 +147,9 @@ body.home div.body-wrapper {
 
     // 打字过程中文案长度变化，不换行 + 省略号，避免整卡抖动
     #typewriter-text {
+      // flex: 1 1 auto + min-width: 0 才允许被压缩；
+      // 少了 flex 的收缩，nowrap 文案会按 max-content 顶宽整条打字栏
+      flex: 1 1 auto;
       min-width: 0;
       overflow: hidden;
       white-space: nowrap;
@@ -511,7 +527,7 @@ body.home div.body-wrapper {
     padding: 2rem 1.25rem 3.5rem;
 
     .hero-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .hero-photo-card {
