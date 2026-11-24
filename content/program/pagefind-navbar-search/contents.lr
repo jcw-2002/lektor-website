@@ -1,0 +1,203 @@
+_model: section-page
+---
+title: 给 Lektor 博客接入 Pagefind：从独立搜索页到导航栏下拉
+---
+category: 博客
+---
+root_path: /program/
+---
+summary: 站点是纯静态 Lektor，希望有全站搜索。第一版做了独立搜索页，后来按「结果直接在导航栏下方展开」的需求重写成搜索框 + 下拉列表：索引挂在 <main> 上覆盖全站，用 Pagefind JS API 懒加载，构建期在 CI 里生成索引。
+---
+pub_date: 2026-11-25
+---
+author: jcw
+---
+body:
+
+> 项目路径：`f:\program\blog\lektor-website`
+> 部署链路：本地 / GitHub Actions -> Lektor 构建 + Pagefind 建索引 -> SSH 推送 `dist/` -> 云服务器 `/var/www/wanjc.top` -> Nginx 对外。
+
+## 一、需求
+
+博客是纯静态站，正文是 Lektor 用 Jinja 模板渲染出来的 HTML，没有后端。想要全站搜索，需求分两轮：
+
+**第一轮（最初的想法）**
+
+1. 全站可检索，输入关键词能搜到文章并跳到对应页面；
+2. 首页、语录、文档、图库这些内容也都要能搜到，而不只是 `/program` 下的文章；
+3. 导航栏、页脚、侧边栏、上下篇这类公共区域不要进索引；
+4. 有独立的搜索页，风格与博客一致；
+5. 构建/部署流程里自动生成索引，`<html lang>` 要是 `zh-CN`。
+
+**第二轮（最终形态）**
+
+6. 不要独立搜索页：搜索框直接放在导航栏右侧，结果以列表框的形式展开在输入框下方；
+7. 与现有 PJAX 局部跳转共存，切页时搜索框不能被重建、不能丢失状态。
+
+## 二、为什么选 Pagefind
+
+- **纯静态**：索引是构建产物（`dist/pagefind/`），不需要 Elasticsearch/Meilisearch 这类常驻服务，也不用给服务器加端口；
+- **零外链**：索引和站点同源托管，Nginx 直接发文件，不依赖第三方搜索服务；
+- **中文分词**：Pagefind 会读每页的 `<html lang>`，`zh-CN` 时启用 Jieba 分词，中文搜索可用；
+- **产物可缓存**：索引分片按内容哈希命名，CDN/浏览器缓存友好。
+
+接入成本也低：构建完 `npx pagefind --site ./dist` 就多出一个 `pagefind/` 目录。
+
+## 三、索引范围：一个属性挂在 `<main>` 上
+
+Pagefind 的规则很简单：页面里必须有 `data-pagefind-body`，只索引这个元素内部的内容。
+
+本站模板结构刚好合适——导航栏、页脚、Live2D、AI 面板都在 `<main id="pjax-container">` 之外，所以只在 `templates/layout.html` 上写一次：
+
+```html
+<html lang="zh-CN">
+...
+<main id="pjax-container" data-bodyclass="..."{% block pagefind_attrs %} data-pagefind-body{% endblock %}>
+```
+
+这一条覆盖了所有继承 `layout.html` 的页面：首页 `home.html`、`/program` 文章、语录（`blog-post`）、文档、图库、插件页、更新日志……不用逐个模板改。
+
+反向排除则用 `data-pagefind-ignore` 打补丁（这些都在 `<main>` 内部）：
+
+| 位置 | 模板 | 不索引的原因 |
+|---|---|---|
+| 专栏侧边栏目录树 | `section.html` | 跨文章链接，会让每篇都因兄弟标题被搜到 |
+| 文档树 / TOC / 评论区 | `doc-page.html` | 同上，且评论不算正文 |
+| 插件页左侧 meta | `plugin.html` | 项目链接、版本号无检索价值 |
+| 上下篇导航 | `blog-post.html` | 跨文章链接 |
+| 图库返回链接 | `gallery.html` | 纯导航 |
+
+另外两个页面整页排除：
+
+- **404 页**：`{% if this._path != '/404.html' %}` 不输出 `data-pagefind-body`，错误提示不该出现在搜索结果里；
+- **搜索页**：第一版用 `pagefind_attrs` 块清空该属性，第二版改成导航栏组件后，这个页面整个删掉了。
+
+## 四、第一版：独立搜索页（做完就被砍了）
+
+最初的方案是 `content/search/contents.lr` + `templates/search.html`，页面里引 `pagefind-ui.js/css` 初始化默认 UI：
+
+```js
+new PagefindUI({ element: '#search', showSubResults: true, showImages: false })
+```
+
+能跑，但有两个绕不开的问题：
+
+1. **默认 UI 自带输入框**，没法把输入框搬到导航栏、只把结果留在页面里；
+2. **与 PJAX 相性差**：PJAX 只替换 `#pjax-container`、不重建 `<head>`，所以搜索页的 CSS/JS 只能塞进正文，浏览器「后退」回搜索页时还要处理脚本异步重新插入的时序（我加过 100ms 轮询等 `window.PagefindUI`）。
+
+所以第二版直接换思路：**不用默认 UI，改用 Pagefind 的 JS API，自己渲染下拉列表**。独立搜索页随之删除，`/search` 路由也不再需要。
+
+## 五、第二版：导航栏搜索框 + 下拉列表
+
+### 1. 结构
+
+搜索组件放在 `<nav>` 里、`#pjax-nav` 之外：
+
+```html
+<div class="navbar-search" id="navbar-search" data-bundle="{{ '/pagefind/'|url }}">
+  <label class="navbar-search-field">
+    <i class="fa fa-search" aria-hidden="true"></i>
+    <input class="navbar-search-input" type="search" placeholder="搜索全站…"
+      autocomplete="off" role="combobox" aria-expanded="false"
+      aria-controls="navbar-search-results">
+  </label>
+  <ul class="navbar-search-results" id="navbar-search-results" hidden></ul>
+</div>
+```
+
+放在 `#pjax-nav` 外的原因：PJAX 的 `selectors` 是 `title / #pjax-container / #pjax-nav`，只有这三块会随路由替换。搜索框留在外面，切页时**不会被销毁**，事件监听只绑一次，输入到一半切页也不会丢。
+
+### 2. 走 JS API，而不是默认 UI
+
+`assets/js/nav-search.js`（`type="module"`，只在首次聚焦/输入时动态 import，首屏不加载索引）：
+
+```js
+var pagefind = await import(bundle + 'pagefind.js');
+var res = await pagefind.search(term);
+var items = await Promise.all(res.results.slice(0, 6).map(r => r.data()));
+// items[i] = { url, excerpt, meta.title }
+```
+
+几个细节：
+
+- **防抖 220ms** + **请求序号**：每次输入 `seq++`，回调里 `token !== seq` 就丢弃，避免慢请求覆盖新结果；
+- **结果条数上限 6**：`r.data()` 要读分片，取太多会拖慢；
+- **`excerpt` 直接 `innerHTML`**：Pagefind 生成的高亮摘要只含 `<mark>`，其余文本已转义；标题用 `textContent` 赋值，避免注入；
+- **键盘**：`Esc` 收起并失焦，`Enter` 打开第一条；
+- **点空白收起**：`document` 上监听，判断 `!root.contains(e.target)`；
+- **切页收起**：监听 `pjax:complete`，把上一页残留的下拉关掉。
+
+索引不存在时（比如 `lektor server` 本地开发）只渲染一行提示，不抛异常：
+
+```
+搜索索引不可用：请先构建并生成 pagefind 索引
+```
+
+### 3. 结果点击为什么是整页跳转
+
+下拉里的 `<a>` 是运行时动态生成的，而 `pjax.js` 是**逐元素绑定**（`pjax.refresh(regions)` 只刷新容器内的链接），新建的节点拿不到监听器，所以点击走浏览器原生跳转。对搜索来说这反而是好事：搜索结果本来就该是一次「干净的进入」，不会把搜索结果页的状态带进下一篇文章。
+
+## 六、样式与断点
+
+导航栏本来就有 8 个菜单项，加上搜索框很容易把一行挤爆（float 换行会让导航栏突然变成两行）。实测后按三档处理：
+
+| 屏宽 | 形态 |
+|---|---|
+| ≥ 992px | 190px 胶囊输入框，聚焦时展开到 240px |
+| 768–991px | 收成 42px 放大镜图标；聚焦时整个组件绝对定位浮到导航上层展开 240px |
+| < 768px | 折叠菜单里占满一行，结果面板改为 `position: static` 随文档流展开 |
+
+结果卡片：白底、10px 圆角、`z-index: 1050`、`max-height: 70vh` 可滚动；标题用主题色 `#77304c`，摘要两行截断，`<mark>` 用淡黄底色。
+
+## 七、构建与部署
+
+Pagefind 依赖构建后的 HTML，所以必须是 `lektor build` 之后、上传 `dist` 之前：
+
+```yaml
+- name: Build site with Lektor & Webpack
+  run: uv run lektor build -f webpack --output-path ./dist
+
+- name: Build search index with Pagefind
+  run: npx -y pagefind --site ./dist --glob "**/[!_]*.html"
+```
+
+Node.js 工作流里本来就有（webpack 用），`npx` 临时拉 Pagefind CLI 即可。`dist/` 和 `_build/` 补进 `.gitignore`，构建产物不入库。
+
+Nginx 侧只有一条要注意：`/pagefind/` 下的 `pagefind-entry.json`、`pagefind.js` 是**不带哈希的固定文件名**，不能设 `immutable` 长缓存，否则用户会拿旧脚本去请求新索引分片。给个 1 小时的 `Cache-Control` 就够。
+
+## 八、踩坑记录
+
+| 坑 | 原因 | 解法 |
+|---|---|---|
+| `_404.html` 报 `拒绝访问 (os error 5)` | `404.html` 这个 slug 已被错误页文件占用，Lektor 把该页附件放进 `_404.html/` **目录**；Pagefind 默认 glob `**/*.{html}` 把它当网页去读 | `--glob "**/[!_]*.html"` 排除下划线开头 |
+| 「W JC」点不动了 | 为给窄屏搜索框做定位上下文，给 `.navbar-collapse` 加了 `position: relative`，它因此画在左侧浮动的 `.navbar-header` 之上，矩形从容器左边一直铺到右边，整块盖住了品牌链接 | 给 `.navbar-header` 加 `position: relative; z-index: 2` |
+| 768–991px 导航栏变两行 | 输入框变宽后右侧 float 放不下，浮动元素被挤到下一行 | 该档收成图标，聚焦时整组件绝对定位展开，不再参与浮动占位 |
+| 展开的输入框比折叠态低 8px、偏左 15px | 绝对定位时 `margin` 仍然生效，`top: 8px` 实际落在 16px | `top: 0; right: 0` 抵消 margin |
+| 聚焦后下拉跑到输入框上面 | 输入框脱流后 label 高度塌陷，面板的 `top: 100%` 跟着上移 | 给容器固定 `height: 34px` |
+| 42px 图标态宽度压不下去 | 输入框有 30px 左内边距 + 1px 边框，`width` 小于这个「最小宽度」无效 | 容器宽度直接按 42px 算 |
+| 无意义关键词也有结果 | Pagefind 自己会做模糊兜底（`zzzzqqq` 也能命中几条），属于上游行为 | 不做额外过滤，「无结果」提示只在候选为空时出现 |
+
+## 九、验收
+
+- 构建：`Indexed 560 pages`，`Discovered 1 language: zh-cn`，无报错；
+- 索引范围：首页、`/program` 文章、语录、文档、图库正文均可搜到，导航/页脚/上下篇/侧边栏不在索引里；
+- 交互（无头 Chrome 实测）：输入「安装」返回 6 条下拉、点第一条跳到 `/program/hexo-cloud/`；输入「conda」返回 `/program/conda/`；清空输入自动收起；点空白处收起；`Esc` 收起；
+- 布局：1200 / 992 / 900 / 800 / 768px 导航栏高度均为 51px（无换行），390px 折叠菜单里输入框满宽、下拉随文档流展开；
+- 品牌链接：四个断点下点击命中元素都是 `a.navbar-brand`，点击后回到 `/`。
+
+## 十、维护备忘
+
+```bash
+# 只写文章 / 看排版：照旧用开发服务器（搜索框会提示索引不可用，属正常）
+uv run lektor server -f webpack
+
+# 需要验证搜索时：构建 + 建索引 + 预览（--serve 会先重建索引再起服务）
+uv run lektor build -f webpack --output-path ./dist
+npx -y pagefind --site ./dist --serve     # http://localhost:1414
+
+# 平时不用管：push 到 main 后，Action 里 build -> pagefind -> 同步 dist
+```
+
+搜索功能的全部代码就两处：`templates/layout.html`（结构 + 属性）、`assets/js/nav-search.js`（行为），样式在 `webpack/scss/main.scss` 的 `.navbar-search` 段。以后想调整下拉条数、防抖时长，改脚本顶部的 `MAX_RESULTS` / `DEBOUNCE` 即可。
+
+> 简化版记录见「更新」里的《给博客加上导航栏全站搜索（Pagefind）》。

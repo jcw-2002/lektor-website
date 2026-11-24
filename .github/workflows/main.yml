@@ -41,12 +41,22 @@ jobs:
         run: |
           uv run lektor build -f webpack --output-path ./dist
 
-      # 6. 导出博客纯文本/Markdown 数据（whale_agent 博客知识库的数据源）
+      # 6. 生成 Pagefind 全站搜索索引
+      #    必须放在 lektor build 之后、上传 dist 之前：它会读取 dist 里的 HTML，
+      #    并写出 dist/pagefind/（pagefind-ui.js / pagefind-ui.css / 索引分片）。
+      #    Node.js 已在上面的 setup-node 步骤装好，npx 会临时拉取 pagefind CLI。
+      #    --glob 排除 dist/_404.html/（Lektor 给 404 页附件建的目录，名字以 .html
+      #    结尾会被默认 glob 当成网页，导致一条 "failed to read" 噪音报错）。
+      - name: Build search index with Pagefind
+        run: |
+          npx -y pagefind --site ./dist --glob "**/[!_]*.html"
+
+      # 7. 导出博客纯文本/Markdown 数据（whale_agent 博客知识库的数据源）
       - name: Export blog data for Whale Agent
         run: |
           uv run python scripts/export_blog_data.py --site-url https://wanjc.top --output ./dist_blog_data
 
-      # 7. 同步网站到 Ubuntu 服务器
+      # 8. 同步网站到 Ubuntu 服务器
       - name: Deploy to Ubuntu Server
         uses: easingthemes/ssh-deploy@main
         with:
@@ -58,7 +68,7 @@ jobs:
           TARGET: "/var/www/wanjc.top"
           EXCLUDE: "/dist/, /node_modules/"
 
-      # 8. 同步博客数据到 whale_agent 数据目录
+      # 9. 同步博客数据到 whale_agent 数据目录
       #    注意：目标必须是独立目录，不能放进 /var/www/wanjc.top（会被上一步 --delete 清掉）
       #    --chmod 保证以 root 推送时 wjc 用户依然可读
       - name: Deploy blog data to Whale Agent

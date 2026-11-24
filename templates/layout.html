@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+{# lang 会写进 Pagefind 索引：zh-CN 让 Pagefind 启用中文分词、并把搜索结果页的
+   界面文案按中文渲染（Pagefind 按 <html lang> 判定页面语言）。 #}
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -45,6 +47,25 @@
           <li><a href="/files" data-pjax="false" target="_blank"
             rel="noopener noreferrer">云盘</a></li>
         </ul>
+
+        {#
+          导航栏右侧的全站搜索（Pagefind JS API，见 assets/js/nav-search.js）。
+          - 不跳转到独立搜索页：输入后结果以列表框的形式直接展开在输入框下方；
+          - data-bundle 由 |url 生成（站点 url_style = absolute），脚本据此动态
+            import /pagefind/pagefind.js，换路径/反代时只需保证该目录可访问；
+          - 这个容器在 #pjax-nav 之外，PJAX 切页不会重建它，监听器只绑定一次。
+        #}
+        <div class="navbar-search" id="navbar-search"
+          data-bundle="{{ '/pagefind/'|url }}">
+          <label class="navbar-search-field">
+            <i class="fa fa-search" aria-hidden="true"></i>
+            <input class="navbar-search-input" type="search" placeholder="搜索全站…"
+              autocomplete="off" role="combobox" aria-autocomplete="list"
+              aria-expanded="false" aria-controls="navbar-search-results"
+              aria-label="搜索本站">
+          </label>
+          <ul class="navbar-search-results" id="navbar-search-results" hidden></ul>
+        </div>
       </div>
     </div>
   </nav>
@@ -60,7 +81,10 @@
       - data-bodyclass 把各页的 body class（poster / default）带过来，
         供 pjax:complete 同步，首页的排版样式因此不会在切页后错乱。
     #}
-    <main id="pjax-container" data-bodyclass="{{ self.bodyclass()|trim }}">
+    {# data-pagefind-body 挂在 <main> 上：导航栏、页脚、Live2D 都在 <main> 之外，
+       因此全站每个页面（首页、文章、语录、文档、图库……）的正文都会被索引，
+       而导航、页脚、搜索结果框这些公共区域不会被索引。 #}
+    <main id="pjax-container" data-bodyclass="{{ self.bodyclass()|trim }}"{#- 404 页只是错误提示，不是内容，不进索引 -#}{% block pagefind_attrs %}{% if this._path != '/404.html' %} data-pagefind-body{% endif %}{% endblock %}>
       {% block outerbody %}
       <div class="container">
         {% block body %}{% endblock %}
@@ -129,6 +153,10 @@
        CDN 兜底，全部加载失败时自动退化成普通整页跳转。 -->
   <script src="{{ '/js/pjax.js'|asseturl }}"
           data-lib="{{ '/js/vendor/pjax.min.js'|asseturl }}"></script>
+
+  <!-- 导航栏全站搜索：Pagefind JS API。pagefind.js 只在首次聚焦/输入时动态 import，
+       首屏不加载索引；结果以列表框展示在搜索框下方，不跳转独立搜索页。 -->
+  <script type="module" src="{{ '/js/nav-search.js'|asseturl }}"></script>
 
   <!-- Live2D 看板娘：入口 assets/live2d/widget.js，内部按组件拆到 assets/live2d/js/。
        type="module" 是必须的（入口用 import 装配各组件），浏览器原生加载，无需打包。 -->

@@ -1113,6 +1113,197 @@ div.doc-styling div.gsc-control-cse {
   padding-top: 5px;
 }
 
+/* 导航栏全站搜索（templates/layout.html + assets/js/nav-search.js + Pagefind） */
+// 窄屏下搜索框展开时相对导航内容区定位（否则会以视口为参照跑偏）
+.navbar .navbar-collapse {
+  position: relative;
+}
+
+// 必须把品牌区抬到 .navbar-collapse 之上：
+// .navbar-collapse 加上 position: relative 后成了定位元素，会画在左侧浮动的
+// .navbar-header 之上，它的矩形从容器左边缘一直铺到右边缘，于是把「W JC」
+// 的点击区域整块盖住（表现为链接点不动）。
+.navbar .navbar-header {
+  position: relative;
+  z-index: 2;
+}
+
+.navbar-search {
+  position: relative;
+  float: right;
+  margin: 8px 0 8px 15px;
+
+  .navbar-search-field {
+    display: block;
+    position: relative;
+    margin: 0;
+    font-weight: normal;
+
+    .fa-search {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      color: #b9b1b4;
+      pointer-events: none;
+    }
+  }
+
+  .navbar-search-input {
+    width: 190px;
+    height: 34px;
+    padding: 6px 10px 6px 30px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 17px;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1;
+    box-shadow: none;
+    transition: width 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+
+    &::placeholder {
+      color: #b9b1b4;
+    }
+
+    &:focus {
+      width: 240px;
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.45);
+      outline: none;
+      box-shadow: none;
+    }
+
+    // 深色导航上原生的「×」很难看，交给键盘/重新输入清除
+    &::-webkit-search-cancel-button {
+      -webkit-appearance: none;
+    }
+  }
+
+  // 结果列表框：绝对定位挂在输入框下方，浮在正文之上
+  .navbar-search-results {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1050;
+    width: 360px;
+    max-height: 70vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 6px 0 0 0;
+    padding: 6px;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #e4e4e7;
+    border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    text-align: left;
+
+    > li {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    a.navbar-search-item {
+      display: block;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: $gray;
+      text-decoration: none;
+
+      &:hover,
+      &:focus {
+        background: #f8eff3;
+        color: $gray;
+        text-decoration: none;
+      }
+    }
+  }
+
+  .navbar-search-title {
+    display: block;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1.4;
+    color: $brand-primary;
+  }
+
+  .navbar-search-excerpt {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 2px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #71717a;
+
+    mark {
+      background: #ffeda6;
+      color: inherit;
+      padding: 0;
+    }
+  }
+
+  .navbar-search-empty {
+    padding: 10px;
+    font-size: 13px;
+    color: #a1a1aa;
+  }
+
+  // 768–991px：导航项几乎占满整行，搜索框平时收成一个图标；
+  // 聚焦后整个组件浮到导航条上层（绝对定位），既不会把导航项挤到第二行，
+  // 也保证放大镜图标始终在输入框左侧、下拉紧贴输入框下方。
+  @media (min-width: 768px) and (max-width: $screen-sm-max) {
+    // 42px 是输入框「边框 + 左右内边距」的最小宽度，再小也压不下去
+    width: 42px;
+    height: 34px;
+    margin-left: 10px;
+
+    .navbar-search-input {
+      width: 100%;
+    }
+
+    &:focus-within {
+      // top/right 抵消上面的 margin，展开后与折叠态图标的右边、垂直位置完全对齐
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 1031;
+      width: 240px;
+
+      .navbar-search-input {
+        width: 100%;
+        background: #4b4347;
+      }
+    }
+
+    .navbar-search-results {
+      width: 300px;
+    }
+  }
+
+  // 折叠菜单里（<768px）占满一行，下拉跟着文档流展开
+  @media (max-width: $screen-xs-max) {
+    float: none;
+    margin: 0 15px 12px 15px;
+
+    .navbar-search-input,
+    .navbar-search-input:focus {
+      width: 100%;
+    }
+
+    .navbar-search-results {
+      position: static;
+      width: auto;
+      max-height: 60vh;
+      margin-top: 6px;
+    }
+  }
+}
+
 /* gitter */
 aside.gitter-chat-embed {
   z-index: 10000;

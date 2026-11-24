@@ -3,7 +3,8 @@
 {% block title %}{{ (this.title ~ ' | ') if this.title != 'Documentation' }}Documentation{% endblock %}
 {% block body %}
   <div class="row">
-    <div class="col-sm-3">
+    {# 左侧是文档树导航（跨页链接），不进索引 #}
+    <div class="col-sm-3" data-pagefind-ignore>
       <ul class="tree-nav nocontent">
         <li{% if this._path == '/docs' %} class="active"{% endif
           %}><a href="{{ '/docs'|url }}">Welcome</a></li>
@@ -92,7 +93,7 @@
       {% endif %}
 
       {% if this.allow_comments %}
-      <div class="comment-box">
+      <div class="comment-box" data-pagefind-ignore>
         <h2>Comments</h2>
         {{ render_disqus_comments() }}
       </div>

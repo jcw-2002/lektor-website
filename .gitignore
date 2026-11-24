@@ -15,3 +15,8 @@ _html/
 # whale_agent 博客知识库导出产物（由 scripts/export_blog_data.py 生成，不入库）
 dist_blog_data/
 
+# 构建产物：CI 输出到 ./dist（含 Pagefind 生成的 dist/pagefind/），
+# 本地 lektor build 默认输出 _build/，两者都不该进 Git
+dist/
+_build/
+

@@ -1,0 +1,54 @@
+title: 给博客加上导航栏全站搜索（Pagefind）
+---
+summary: 静态博客一直没有全站搜索。最终方案是 Pagefind：索引属性挂在 <main> 上覆盖所有页面，导航栏右侧放搜索框，结果用 Pagefind JS API 渲染成下拉列表，索引在 GitHub Actions 里构建完自动生成。
+---
+pub_date: 2026-11-25
+---
+author: jcw
+---
+body:
+
+#### text-block ####
+text:
+
+> 站点：Lektor 静态站 -> GitHub Actions 构建 -> `dist/` 同步到 `/var/www/wanjc.top` -> Nginx。
+
+## 需求
+
+想要全站搜索，先做了一版独立搜索页；后来改成「搜索框放导航栏右侧、结果在下面以列表展开」，不要单独页面。首页、语录、文档、图库都要能搜到，导航栏和页脚不要进索引，并且不能破坏现有的 PJAX 局部跳转。
+
+## 做法
+
+**索引范围**：`data-pagefind-body` 只写一次，挂在 `templates/layout.html` 的 `<main>` 上（导航、页脚、Live2D 都在它外面），所以全站页面自动覆盖；侧边栏、上下篇、评论区用 `data-pagefind-ignore` 排除；404 页不加该属性。`<html lang="zh-CN">` 让 Pagefind 启用中文分词。
+
+**搜索框**：不用 Pagefind 自带的 UI（它和输入框绑在一起，搬不进导航栏），改用 JS API：
+
+```js
+const pagefind = await import('/pagefind/pagefind.js');   // 首次聚焦/输入才加载
+const res = await pagefind.search(term);
+const items = await Promise.all(res.results.slice(0, 6).map(r => r.data()));
+```
+
+220ms 防抖 + 请求序号丢弃过期结果，取前 6 条渲染标题和带 `<mark>` 的高亮摘要。组件放在 `#pjax-nav` 之外，PJAX 切页不会重建它，只在 `pjax:complete` 时收起残留的下拉。
+
+**断点**：≥992px 190px 输入框（聚焦 240px）；768–991px 收成 42px 图标、聚焦时浮到导航上层展开；<768px 折叠菜单里占满一行、结果随文档流展开。
+
+**构建**：`lektor build` 之后、上传 `dist` 之前加一步：
+
+```bash
+npx -y pagefind --site ./dist --glob "**/[!_]*.html"
+```
+
+## 两个值得记的坑
+
+1. **`_404.html` 报错**：它不是网页，是 Lektor 给 404 页附件建的目录。Pagefind 默认 glob 会把它当 HTML 去读，于是日志里出现 `Failed to read ... 拒绝访问 (os error 5)`（非致命）。用 `--glob "**/[!_]*.html"` 排除下划线开头的名字即可。
+2. **「W JC」点不动了**：为了给窄屏搜索框做定位上下文，给 `.navbar-collapse` 加了 `position: relative`，它因此画在左侧浮动的品牌区之上，矩形从容器左边一直铺到右边，把首页链接整块盖住。给 `.navbar-header` 补 `position: relative; z-index: 2` 解决。
+
+## 结果
+
+- 一次构建索引 560 页，语言识别为 `zh-cn`，`/pagefind/` 随 `dist/` 一起部署；
+- 输入「安装」「conda」都能在导航栏下方出结果，点击直达文章；
+- 1200 / 992 / 900 / 800 / 768 / 390px 下导航栏不换行，首页链接与搜索框都正常可点；
+- 之后发文章只需要 `git push`，构建、建索引、部署全在 Action 里完成。
+
+> 完整的取舍过程、代码片段和踩坑细节见编程专栏里的《给 Lektor 博客接入 Pagefind：从独立搜索页到导航栏下拉》。

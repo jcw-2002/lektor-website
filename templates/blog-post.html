@@ -22,7 +22,9 @@
     {% set siblings = this.get_siblings() %}
     {% set older = siblings.next_page %}
     {% set newer = siblings.prev_page %}
-    <div class="container">
+    {# 上下篇导航属于跨文章链接，不参与 Pagefind 索引（否则每篇文章都会
+       因为兄弟文章标题被搜到） #}
+    <div class="container" data-pagefind-ignore>
       <div class="row">
         <div class="col-md-8 col-md-offset-2">
         {% if older %}

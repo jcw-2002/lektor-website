@@ -13,7 +13,7 @@
 {% endblock %}
 {% block body %}
   {% if this.parent and this.parent != site.root %}
-    <div class="showcase-site back-link">
+    <div class="showcase-site back-link" data-pagefind-ignore>
       <a href="{{ this.parent|url }}">« Back to {{ this.parent.name or 'Gallery' }}</a>
     </div>
   {% endif %}
